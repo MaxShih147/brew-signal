@@ -1,6 +1,6 @@
 import axios from 'axios'
 import type {
-  IPItem, IPDetail, TrendResponse, HealthData, SignalsData, CollectResult, Alias,
+  IPItem, IPDetail, TrendResponse, HealthData, SignalsData, CollectResult, Alias, DiscoverAliasesResponse,
 } from '../types'
 
 const api = axios.create({
@@ -24,6 +24,10 @@ export const addAlias = (ipId: string, body: { alias: string; locale: string; we
 export const updateAlias = (aliasId: string, body: Partial<Alias>) =>
   api.put<Alias>(`/ip/alias/${aliasId}`, body).then(r => r.data)
 
+export const deleteIP = (id: string) => api.delete(`/ip/${id}`)
+
+export const deleteAlias = (aliasId: string) => api.delete(`/ip/alias/${aliasId}`)
+
 // Trend
 export const getTrend = (ipId: string, geo: string, timeframe: string, mode: string = 'composite') =>
   api.get<TrendResponse>(`/ip/${ipId}/trend`, { params: { geo, timeframe, mode } }).then(r => r.data)
@@ -35,6 +39,10 @@ export const getHealth = (ipId: string, geo: string, timeframe: string) =>
 // Signals
 export const getSignals = (ipId: string, geo: string, timeframe: string) =>
   api.get<SignalsData>(`/ip/${ipId}/signals`, { params: { geo, timeframe } }).then(r => r.data)
+
+// Discover aliases (AI)
+export const discoverAliases = (ipId: string, autoAdd: boolean = true) =>
+  api.post<DiscoverAliasesResponse>(`/ip/${ipId}/discover-aliases?auto_add=${autoAdd}`, {}).then(r => r.data)
 
 // Collect
 export const runCollect = (ipId: string, geo: string, timeframe: string) =>

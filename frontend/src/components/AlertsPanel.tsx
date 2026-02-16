@@ -32,9 +32,9 @@ export default function AlertsPanel({ alerts }: Props) {
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${style.text}`}>
                   {style.label}
                 </span>
-                {alert.date && (
+                {alert.alert_date && (
                   <span className="text-[10px] text-stone-400">
-                    {new Date(alert.date).toLocaleDateString()}
+                    {new Date(alert.alert_date).toLocaleDateString()}
                   </span>
                 )}
               </div>

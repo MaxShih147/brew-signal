@@ -1,13 +1,17 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.models import IP, IPAlias, DailyTrend
-from app.schemas import IPCreate, IPOut, IPUpdate, IPListItem, AliasCreate, AliasUpdate, AliasOut
+from app.models import IP, IPAlias, DailyTrend, TrendPoint, CollectorRunLog
+from app.schemas import (
+    IPCreate, IPOut, IPUpdate, IPListItem, AliasCreate, AliasUpdate, AliasOut,
+    DiscoverAliasesRequest, DiscoverAliasesResponse, DiscoveredAlias,
+)
+from app.services.alias_discovery import discover_aliases
 
 router = APIRouter(prefix="/api/ip", tags=["ip"])
 
@@ -73,6 +77,16 @@ async def get_ip(ip_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     return ip
 
 
+@router.delete("/{ip_id}", status_code=204)
+async def delete_ip(ip_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(IP).where(IP.id == ip_id))
+    ip = result.scalar_one_or_none()
+    if not ip:
+        raise HTTPException(404, "IP not found")
+    await db.delete(ip)
+    await db.commit()
+
+
 @router.post("/{ip_id}/aliases", response_model=AliasOut, status_code=201)
 async def add_alias(ip_id: uuid.UUID, body: AliasCreate, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(IP).where(IP.id == ip_id))
@@ -96,3 +110,62 @@ async def update_alias(alias_id: uuid.UUID, body: AliasUpdate, db: AsyncSession 
     await db.commit()
     await db.refresh(alias)
     return alias
+
+
+@router.delete("/alias/{alias_id}", status_code=204)
+async def delete_alias(alias_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(IPAlias).where(IPAlias.id == alias_id))
+    alias = result.scalar_one_or_none()
+    if not alias:
+        raise HTTPException(404, "Alias not found")
+    await db.delete(alias)
+    await db.commit()
+
+
+@router.post("/{ip_id}/discover-aliases", response_model=DiscoverAliasesResponse)
+async def discover_ip_aliases(
+    ip_id: uuid.UUID,
+    body: DiscoverAliasesRequest = DiscoverAliasesRequest(),
+    auto_add: bool = True,
+    db: AsyncSession = Depends(get_db),
+):
+    """Use Claude AI to auto-discover aliases for an IP.
+
+    - Discovers aliases across zh/jp/en/ko and more
+    - If auto_add=true (default), adds new aliases that don't already exist
+    - Skips duplicates (case-insensitive match against existing aliases)
+    """
+    result = await db.execute(select(IP).options(selectinload(IP.aliases)).where(IP.id == ip_id))
+    ip = result.scalar_one_or_none()
+    if not ip:
+        raise HTTPException(404, "IP not found")
+
+    search_name = body.ip_name or ip.name
+
+    try:
+        discovered_raw = await discover_aliases(search_name)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    discovered = [DiscoveredAlias(**d) for d in discovered_raw]
+
+    # Auto-add new aliases (skip duplicates)
+    applied = 0
+    if auto_add:
+        existing = {a.alias.lower() for a in ip.aliases}
+        for d in discovered:
+            if d.alias.lower() not in existing:
+                new_alias = IPAlias(
+                    ip_id=ip_id,
+                    alias=d.alias,
+                    locale=d.locale,
+                    weight=d.weight,
+                    enabled=True,
+                )
+                db.add(new_alias)
+                existing.add(d.alias.lower())
+                applied += 1
+        if applied > 0:
+            await db.commit()
+
+    return DiscoverAliasesResponse(ip_id=ip_id, discovered=discovered, applied=applied)

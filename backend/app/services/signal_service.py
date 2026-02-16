@@ -108,7 +108,7 @@ def compute_alerts(recent_trends: Sequence[DailyTrend]) -> list[AlertOut]:
         alerts.append(AlertOut(
             type="breakout",
             message=f"Breakout detected: 7d avg at P{latest.breakout_percentile:.0f} of 6-month range",
-            date=latest.date,
+            alert_date=str(latest.date),
         ))
 
     # Peak-turn alert: MA7 crosses below MA28
@@ -122,7 +122,7 @@ def compute_alerts(recent_trends: Sequence[DailyTrend]) -> list[AlertOut]:
             alerts.append(AlertOut(
                 type="peak_turn",
                 message="Peak turn: MA7 crossed below MA28 — trend may be declining",
-                date=latest.date,
+                alert_date=str(latest.date),
             ))
 
     # Spike alert: value > mean + 2σ
@@ -135,7 +135,7 @@ def compute_alerts(recent_trends: Sequence[DailyTrend]) -> list[AlertOut]:
                 alerts.append(AlertOut(
                     type="spike",
                     message=f"Spike: current value {latest.composite_value:.0f} exceeds mean+2σ ({mean_val + 2*std_val:.0f})",
-                    date=latest.date,
+                    alert_date=str(latest.date),
                 ))
 
     return alerts

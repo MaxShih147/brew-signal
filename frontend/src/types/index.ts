@@ -64,7 +64,7 @@ export interface HealthData {
 export interface Alert {
   type: string
   message: string
-  date: string | null
+  alert_date: string | null
 }
 
 export interface SignalsData {
@@ -82,4 +82,17 @@ export interface CollectResult {
   status: string
   message: string
   duration_ms: number | null
+}
+
+export interface DiscoveredAlias {
+  alias: string
+  locale: string
+  weight: number
+  note: string
+}
+
+export interface DiscoverAliasesResponse {
+  ip_id: string
+  discovered: DiscoveredAlias[]
+  applied: number
 }

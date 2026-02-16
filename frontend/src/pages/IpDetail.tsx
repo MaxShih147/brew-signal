@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { getIP, getTrend, getHealth, getSignals, runCollect } from '../api/client'
+import { useParams, Link, useNavigate } from 'react-router-dom'
+import { getIP, getTrend, getHealth, getSignals, runCollect, deleteIP } from '../api/client'
 import type { IPDetail as IPDetailType, DailyTrendPoint, TrendPointRaw, HealthData, SignalsData } from '../types'
 import IpConfigCard from '../components/IpConfigCard'
 import HealthCard from '../components/HealthCard'
@@ -10,6 +10,7 @@ import AlertsPanel from '../components/AlertsPanel'
 
 export default function IpDetail() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
 
   const [ip, setIP] = useState<IPDetailType | null>(null)
   const [geo, setGeo] = useState('TW')
@@ -100,6 +101,19 @@ export default function IpDetail() {
       <div className="flex items-center gap-3 mb-6">
         <Link to="/ips" className="text-brew-600 hover:text-brew-700 text-sm">&larr; Back</Link>
         <h1 className="text-2xl font-bold text-stone-800">{ip.name}</h1>
+        <button
+          onClick={async () => {
+            if (!id || !confirm(`Delete "${ip.name}" and all its data?`)) return
+            await deleteIP(id)
+            navigate('/ips')
+          }}
+          className="text-stone-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
+          title="Delete IP"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+          </svg>
+        </button>
         <button
           onClick={handleCollect}
           disabled={collecting}

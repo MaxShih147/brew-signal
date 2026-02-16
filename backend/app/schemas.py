@@ -104,7 +104,7 @@ class HealthResponse(BaseModel):
 class AlertOut(BaseModel):
     type: str
     message: str
-    date: Optional[date] = None
+    alert_date: Optional[str] = None
 
 
 # --- Signals ---
@@ -130,3 +130,21 @@ class CollectRunResponse(BaseModel):
     status: str
     message: str
     duration_ms: Optional[int] = None
+
+
+# --- Alias Discovery ---
+class DiscoverAliasesRequest(BaseModel):
+    ip_name: Optional[str] = None  # override name to search; defaults to IP.name
+
+
+class DiscoveredAlias(BaseModel):
+    alias: str
+    locale: str
+    weight: float
+    note: str = ""
+
+
+class DiscoverAliasesResponse(BaseModel):
+    ip_id: uuid.UUID
+    discovered: list[DiscoveredAlias]
+    applied: int = 0  # how many were auto-added

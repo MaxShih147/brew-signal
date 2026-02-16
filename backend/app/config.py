@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     pytrends_circuit_breaker_threshold: int = 5
     pytrends_circuit_breaker_cooldown_sec: int = 1800
 
+    # Anthropic Claude API (for alias discovery)
+    anthropic_api_key: str = ""
+
     # Signal thresholds
     signal_wow_growth_threshold: float = 0.30
     signal_acceleration_weeks: int = 2
