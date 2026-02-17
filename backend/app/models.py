@@ -30,6 +30,7 @@ class IPAlias(Base):
     alias: Mapped[str] = mapped_column(String(255), nullable=False)
     locale: Mapped[str] = mapped_column(String(10), nullable=False, default="en")  # zh/jp/en/other
     weight: Mapped[float] = mapped_column(Float, default=1.0)
+    original_weight: Mapped[float | None] = mapped_column(Float, nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
     ip: Mapped["IP"] = relationship(back_populates="aliases")

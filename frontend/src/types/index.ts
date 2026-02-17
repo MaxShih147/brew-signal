@@ -3,6 +3,7 @@ export interface Alias {
   alias: string
   locale: string
   weight: number
+  original_weight: number | null
   enabled: boolean
 }
 

@@ -12,6 +12,7 @@ from app.schemas import (
     DiscoverAliasesRequest, DiscoverAliasesResponse, DiscoveredAlias,
 )
 from app.services.alias_discovery import discover_aliases
+from app.services.trend_service import _compute_daily_aggregation
 
 router = APIRouter(prefix="/api/ip", tags=["ip"])
 
@@ -105,10 +106,40 @@ async def update_alias(alias_id: uuid.UUID, body: AliasUpdate, db: AsyncSession 
     alias = result.scalar_one_or_none()
     if not alias:
         raise HTTPException(404, "Alias not found")
-    for field, val in body.model_dump(exclude_unset=True).items():
+    updates = body.model_dump(exclude_unset=True)
+    needs_reaggregate = "enabled" in updates or "weight" in updates
+    for field, val in updates.items():
         setattr(alias, field, val)
     await db.commit()
     await db.refresh(alias)
+
+    # Re-aggregate composite when enabled or weight changes
+    if needs_reaggregate:
+        for geo in ["TW", "JP", "US", "WW"]:
+            for tf in ["90d", "12m", "5y"]:
+                await _compute_daily_aggregation(db, alias.ip_id, geo, tf)
+
+    return alias
+
+
+@router.post("/alias/{alias_id}/reset-weight", response_model=AliasOut)
+async def reset_alias_weight(alias_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Reset alias weight to original discovery value."""
+    result = await db.execute(select(IPAlias).where(IPAlias.id == alias_id))
+    alias = result.scalar_one_or_none()
+    if not alias:
+        raise HTTPException(404, "Alias not found")
+    if alias.original_weight is None:
+        raise HTTPException(400, "No original weight stored for this alias")
+    alias.weight = alias.original_weight
+    await db.commit()
+    await db.refresh(alias)
+
+    # Re-aggregate composite
+    for geo in ["TW", "JP", "US", "WW"]:
+        for tf in ["90d", "12m", "5y"]:
+            await _compute_daily_aggregation(db, alias.ip_id, geo, tf)
+
     return alias
 
 
@@ -160,6 +191,7 @@ async def discover_ip_aliases(
                     alias=d.alias,
                     locale=d.locale,
                     weight=d.weight,
+                    original_weight=d.weight,
                     enabled=True,
                 )
                 db.add(new_alias)

@@ -119,16 +119,40 @@ async def _compute_daily_aggregation(
     ip_id: uuid.UUID,
     geo: str,
     timeframe: str,
-    aliases: list[IPAlias],
+    aliases: list[IPAlias] | None = None,
 ):
     """Compute weighted composite values and signals for each date."""
-    # Get all trend points for this IP+geo+timeframe
+    # If aliases not passed, fetch enabled aliases from DB
+    if aliases is None:
+        alias_result = await db.execute(
+            select(IPAlias).where(IPAlias.ip_id == ip_id, IPAlias.enabled == True)
+        )
+        aliases = list(alias_result.scalars().all())
+
+    # Build weight map from enabled aliases only
+    enabled_alias_ids = {a.id for a in aliases if a.enabled}
+    weight_map = {a.id: a.weight for a in aliases if a.enabled}
+
+    if not enabled_alias_ids:
+        # No enabled aliases — clear daily trend data
+        await db.execute(
+            delete(DailyTrend).where(
+                DailyTrend.ip_id == ip_id,
+                DailyTrend.geo == geo,
+                DailyTrend.timeframe == timeframe,
+            )
+        )
+        await db.commit()
+        return
+
+    # Get trend points only for enabled aliases
     result = await db.execute(
         select(TrendPoint)
         .where(
             TrendPoint.ip_id == ip_id,
             TrendPoint.geo == geo,
             TrendPoint.timeframe == timeframe,
+            TrendPoint.alias_id.in_(enabled_alias_ids),
         )
         .order_by(TrendPoint.date)
     )
@@ -137,16 +161,13 @@ async def _compute_daily_aggregation(
     if not points:
         return
 
-    # Build weight map
-    weight_map = {a.id: a.weight for a in aliases}
-    total_weight = sum(weight_map.values()) or 1.0
-
     # Group by date, compute weighted composite
     from collections import defaultdict
     date_values: dict = defaultdict(list)
     for pt in points:
-        w = weight_map.get(pt.alias_id, 1.0)
-        date_values[pt.date].append((pt.value, w))
+        w = weight_map.get(pt.alias_id, 0)
+        if w > 0:
+            date_values[pt.date].append((pt.value, w))
 
     sorted_dates = sorted(date_values.keys())
     composite_series = []

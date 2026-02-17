@@ -28,6 +28,9 @@ export const deleteIP = (id: string) => api.delete(`/ip/${id}`)
 
 export const deleteAlias = (aliasId: string) => api.delete(`/ip/alias/${aliasId}`)
 
+export const resetAliasWeight = (aliasId: string) =>
+  api.post<Alias>(`/ip/alias/${aliasId}/reset-weight`).then(r => r.data)
+
 // Trend
 export const getTrend = (ipId: string, geo: string, timeframe: string, mode: string = 'composite') =>
   api.get<TrendResponse>(`/ip/${ipId}/trend`, { params: { geo, timeframe, mode } }).then(r => r.data)

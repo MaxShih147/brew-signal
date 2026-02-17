@@ -24,11 +24,12 @@ async def get_trend(
     if mode == "by_alias":
         result = await db.execute(
             select(TrendPoint, IPAlias.alias)
-            .outerjoin(IPAlias, TrendPoint.alias_id == IPAlias.id)
+            .join(IPAlias, TrendPoint.alias_id == IPAlias.id)
             .where(
                 TrendPoint.ip_id == ip_id,
                 TrendPoint.geo == geo,
                 TrendPoint.timeframe == timeframe,
+                IPAlias.enabled == True,
             )
             .order_by(TrendPoint.date)
         )

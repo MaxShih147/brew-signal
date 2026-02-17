@@ -140,7 +140,7 @@ export default function IpDetail() {
             timeframe={timeframe}
             onGeoChange={setGeo}
             onTimeframeChange={setTimeframe}
-            onRefresh={loadIP}
+            onRefresh={() => { loadIP(); loadData() }}
           />
           <HealthCard health={health} loading={loadingHealth} />
         </div>

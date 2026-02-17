@@ -25,6 +25,7 @@ class AliasOut(BaseModel):
     alias: str
     locale: str
     weight: float
+    original_weight: Optional[float] = None
     enabled: bool
     model_config = {"from_attributes": True}
 

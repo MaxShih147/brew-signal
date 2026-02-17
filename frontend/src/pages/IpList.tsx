@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { listIPs, createIP, deleteIP } from '../api/client'
+import { listIPs, createIP, deleteIP, discoverAliases } from '../api/client'
 import type { IPItem } from '../types'
 import TrafficLight from '../components/TrafficLight'
 
@@ -10,6 +10,8 @@ export default function IpList() {
   const [showCreate, setShowCreate] = useState(false)
   const [newName, setNewName] = useState('')
   const [newAliases, setNewAliases] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [createStatus, setCreateStatus] = useState<string | null>(null)
   const navigate = useNavigate()
 
   const load = async () => {
@@ -24,7 +26,7 @@ export default function IpList() {
   useEffect(() => { load() }, [])
 
   const handleCreate = async () => {
-    if (!newName.trim()) return
+    if (!newName.trim() || creating) return
     const aliases = newAliases
       .split('\n')
       .map(line => line.trim())
@@ -33,11 +35,26 @@ export default function IpList() {
         const [alias, locale = 'en', weight = '1.0'] = line.split(',').map(s => s.trim())
         return { alias, locale, weight: parseFloat(weight) || 1.0 }
       })
-    await createIP(newName.trim(), aliases)
-    setNewName('')
-    setNewAliases('')
-    setShowCreate(false)
-    load()
+    setCreating(true)
+    setCreateStatus('Creating IP...')
+    try {
+      const ip = await createIP(newName.trim(), aliases)
+      setCreateStatus('Discovering aliases via Claude AI...')
+      try {
+        await discoverAliases(ip.id, true)
+      } catch {
+        // Discovery is best-effort; continue even if it fails
+      }
+      setNewName('')
+      setNewAliases('')
+      setShowCreate(false)
+      setCreateStatus(null)
+      navigate(`/ips/${ip.id}`)
+    } catch (err: any) {
+      setCreateStatus(`Error: ${err.response?.data?.detail || err.message}`)
+    } finally {
+      setCreating(false)
+    }
   }
 
   const handleDelete = async (e: React.MouseEvent, id: string, name: string) => {
@@ -84,9 +101,22 @@ export default function IpList() {
               rows={4}
               className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brew-400"
             />
+            {createStatus && (
+              <div className="text-sm text-brew-600 flex items-center gap-2">
+                {creating && (
+                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                )}
+                {createStatus}
+              </div>
+            )}
             <div className="flex gap-2">
-              <button onClick={handleCreate} className="px-4 py-2 bg-brew-600 text-white text-sm rounded-lg hover:bg-brew-700">Create</button>
-              <button onClick={() => setShowCreate(false)} className="px-4 py-2 bg-stone-100 text-stone-600 text-sm rounded-lg hover:bg-stone-200">Cancel</button>
+              <button onClick={handleCreate} disabled={creating} className="px-4 py-2 bg-brew-600 text-white text-sm rounded-lg hover:bg-brew-700 disabled:opacity-50">
+                {creating ? 'Creating...' : 'Create'}
+              </button>
+              <button onClick={() => setShowCreate(false)} disabled={creating} className="px-4 py-2 bg-stone-100 text-stone-600 text-sm rounded-lg hover:bg-stone-200 disabled:opacity-50">Cancel</button>
             </div>
           </div>
         </div>

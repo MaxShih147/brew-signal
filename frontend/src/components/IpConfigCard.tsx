@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { IPDetail, Alias } from '../types'
-import { addAlias, updateAlias, deleteAlias, updateIP } from '../api/client'
+import { addAlias, updateAlias, deleteAlias, updateIP, discoverAliases, resetAliasWeight } from '../api/client'
 
 interface Props {
   ip: IPDetail
@@ -21,6 +21,11 @@ export default function IpConfigCard({ ip, geo, timeframe, onGeoChange, onTimefr
   const [newAlias, setNewAlias] = useState('')
   const [newLocale, setNewLocale] = useState('en')
   const [newWeight, setNewWeight] = useState('1.0')
+
+  const [editingWeightId, setEditingWeightId] = useState<string | null>(null)
+  const [weightVal, setWeightVal] = useState('')
+
+  const [discovering, setDiscovering] = useState(false)
 
   const handleSaveName = async () => {
     if (!nameVal.trim() || nameVal.trim() === ip.name) {
@@ -50,6 +55,37 @@ export default function IpConfigCard({ ip, geo, timeframe, onGeoChange, onTimefr
   const toggleAlias = async (a: Alias) => {
     await updateAlias(a.id, { enabled: !a.enabled })
     onRefresh()
+  }
+
+  const startEditWeight = (a: Alias) => {
+    setEditingWeightId(a.id)
+    setWeightVal(String(a.weight))
+  }
+
+  const saveWeight = async (a: Alias) => {
+    const parsed = parseFloat(weightVal)
+    if (isNaN(parsed) || parsed === a.weight) {
+      setEditingWeightId(null)
+      return
+    }
+    await updateAlias(a.id, { weight: parsed })
+    setEditingWeightId(null)
+    onRefresh()
+  }
+
+  const handleResetWeight = async (a: Alias) => {
+    await resetAliasWeight(a.id)
+    onRefresh()
+  }
+
+  const handleDiscover = async () => {
+    setDiscovering(true)
+    try {
+      await discoverAliases(ip.id, true)
+      onRefresh()
+    } finally {
+      setDiscovering(false)
+    }
   }
 
   return (
@@ -90,7 +126,27 @@ export default function IpConfigCard({ ip, geo, timeframe, onGeoChange, onTimefr
 
         {/* Aliases */}
         <div>
-          <label className="block text-xs font-medium text-stone-500 uppercase tracking-wide mb-2">Aliases</label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-xs font-medium text-stone-500 uppercase tracking-wide">Aliases</label>
+            <button
+              onClick={handleDiscover}
+              disabled={discovering}
+              className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-brew-600 bg-brew-50 border border-brew-200 rounded hover:bg-brew-100 disabled:opacity-50 transition-colors"
+              title="Discover aliases via Claude AI"
+            >
+              {discovering ? (
+                <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+                </svg>
+              )}
+              {discovering ? 'Discovering...' : 'Discover'}
+            </button>
+          </div>
           <div className="space-y-1">
             {ip.aliases.map(a => (
               <div key={a.id} className="flex items-center gap-2 text-sm group py-0.5">
@@ -104,7 +160,35 @@ export default function IpConfigCard({ ip, geo, timeframe, onGeoChange, onTimefr
                 </button>
                 <span className={`${a.enabled ? 'text-stone-800' : 'text-stone-400 line-through'} min-w-0 truncate`}>{a.alias}</span>
                 <span className="text-[10px] text-stone-400 bg-stone-100 px-1.5 py-0.5 rounded shrink-0">{a.locale}</span>
-                <span className="text-[10px] text-stone-400 shrink-0">w={a.weight}</span>
+                {editingWeightId === a.id ? (
+                  <input
+                    value={weightVal}
+                    onChange={e => setWeightVal(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') saveWeight(a); if (e.key === 'Escape') setEditingWeightId(null) }}
+                    onBlur={() => saveWeight(a)}
+                    autoFocus
+                    className="w-12 px-1 py-0.5 border border-brew-300 rounded text-[10px] text-center focus:outline-none focus:ring-1 focus:ring-brew-400"
+                  />
+                ) : (
+                  <button
+                    onClick={() => startEditWeight(a)}
+                    className="text-[10px] text-stone-400 hover:text-brew-600 hover:bg-brew-50 px-1 py-0.5 rounded shrink-0 transition-colors cursor-pointer"
+                    title="Click to edit weight"
+                  >
+                    w={a.weight}
+                  </button>
+                )}
+                {a.original_weight !== null && a.original_weight !== undefined && a.weight !== a.original_weight && (
+                  <button
+                    onClick={() => handleResetWeight(a)}
+                    className="text-[10px] text-stone-400 hover:text-brew-600 transition-colors shrink-0"
+                    title={`Reset to original weight (${a.original_weight})`}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+                    </svg>
+                  </button>
+                )}
                 <button
                   onClick={() => handleDeleteAlias(a)}
                   className="opacity-0 group-hover:opacity-100 ml-auto text-stone-400 hover:text-red-500 transition-opacity shrink-0"
