@@ -47,6 +47,9 @@ frontend/
 - **Collectors**: pytrends (default fallback) with rate limiter + circuit breaker
 - **Alias Discovery**: Claude API auto-finds aliases across zh/jp/en/ko
 
+## Workflow
+- When the user says "pass", "lgtm", "ship it", or similar approval phrases — commit and push to origin without asking for review
+
 ## Conventions
 - Backend uses async SQLAlchemy throughout
 - Pydantic v2 schemas — avoid `from __future__ import annotations` (causes union issues)
