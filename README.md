@@ -104,6 +104,10 @@ All thresholds are configurable via `.env`:
 | `PYTRENDS_REQUEST_INTERVAL_SEC` | 5 | Min seconds between pytrends requests |
 | `PYTRENDS_CIRCUIT_BREAKER_THRESHOLD` | 5 | Consecutive failures before circuit opens |
 
+## TODO
+
+- [ ] Validate alias weights against actual Google Trends data after discovery (currently weights are Claude's best guess, not backed by real search volume)
+
 ## Tech Stack
 
 - **Backend**: Python, FastAPI, SQLAlchemy (async), Alembic, pytrends
