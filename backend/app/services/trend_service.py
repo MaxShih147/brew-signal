@@ -133,15 +133,17 @@ async def _compute_daily_aggregation(
     enabled_alias_ids = {a.id for a in aliases if a.enabled}
     weight_map = {a.id: a.weight for a in aliases if a.enabled}
 
-    if not enabled_alias_ids:
-        # No enabled aliases — clear daily trend data
-        await db.execute(
-            delete(DailyTrend).where(
-                DailyTrend.ip_id == ip_id,
-                DailyTrend.geo == geo,
-                DailyTrend.timeframe == timeframe,
-            )
+    # Always clear existing daily trend rows first so stale data from
+    # disabled aliases doesn't persist.
+    await db.execute(
+        delete(DailyTrend).where(
+            DailyTrend.ip_id == ip_id,
+            DailyTrend.geo == geo,
+            DailyTrend.timeframe == timeframe,
         )
+    )
+
+    if not enabled_alias_ids:
         await db.commit()
         return
 
@@ -159,6 +161,7 @@ async def _compute_daily_aggregation(
     points = result.scalars().all()
 
     if not points:
+        await db.commit()
         return
 
     # Group by date, compute weighted composite
