@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.models import IP, IPAlias, IPEvent, DailyTrend, TrendPoint, CollectorRunLog
+from app.models import IP, IPAlias, IPEvent, DailyTrend, TrendPoint, CollectorRunLog, IPPipeline, IPConfidence
 from app.schemas import (
     IPCreate, IPOut, IPUpdate, IPListItem, AliasCreate, AliasUpdate, AliasOut,
     DiscoverAliasesRequest, DiscoverAliasesResponse, DiscoveredAlias,
@@ -33,7 +33,11 @@ async def create_ip(body: IPCreate, db: AsyncSession = Depends(get_db)):
 
 @router.get("", response_model=list[IPListItem])
 async def list_ips(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(IP).options(selectinload(IP.aliases)).order_by(IP.created_at.desc()))
+    result = await db.execute(
+        select(IP)
+        .options(selectinload(IP.aliases))
+        .order_by(IP.created_at.desc())
+    )
     ips = result.scalars().all()
 
     items = []
@@ -46,6 +50,19 @@ async def list_ips(db: AsyncSession = Depends(get_db)):
             .limit(1)
         )
         dt = dt_result.scalar_one_or_none()
+
+        # Get pipeline data (cached BD score)
+        pip_result = await db.execute(
+            select(IPPipeline).where(IPPipeline.ip_id == ip.id)
+        )
+        pip = pip_result.scalar_one_or_none()
+
+        # Get confidence score
+        conf_result = await db.execute(
+            select(IPConfidence.confidence_score).where(IPConfidence.ip_id == ip.id)
+        )
+        conf_score = conf_result.scalar_one_or_none()
+
         items.append(IPListItem(
             id=ip.id,
             name=ip.name,
@@ -53,6 +70,10 @@ async def list_ips(db: AsyncSession = Depends(get_db)):
             aliases=ip.aliases,
             last_updated=dt.date if dt else None,
             signal_light=dt.signal_light if dt else None,
+            bd_score=pip.bd_score if pip else None,
+            bd_decision=pip.bd_decision if pip else None,
+            pipeline_stage=pip.stage if pip else None,
+            confidence_score=conf_score,
         ))
     return items
 

@@ -34,6 +34,17 @@ class Settings(BaseSettings):
     opp_timing_low: float = 0.8
     opp_timing_high: float = 0.4
 
+    # BD Allocation weights
+    bd_weight_timing: float = 0.35
+    bd_weight_demand: float = 0.30
+    bd_weight_market_gap: float = 0.20
+    bd_weight_feasibility: float = 0.15
+    bd_fit_gate_threshold: float = 30.0
+    bd_start_threshold: float = 70.0
+    bd_monitor_threshold: float = 40.0
+    bd_gatekeeper_urgency_factor: float = 0.3
+    bd_base_lead_weeks: int = 12
+
     # Source staleness thresholds (hours) — per source: [fresh_limit, warn_limit]
     # Beyond warn_limit = down. Format: source_key: [fresh_h, warn_h]
     staleness_google_trends_fresh_h: int = 72     # 3d

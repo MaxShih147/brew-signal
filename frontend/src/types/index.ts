@@ -14,6 +14,10 @@ export interface IPItem {
   last_updated: string | null
   signal_light: string | null
   aliases: Alias[]
+  bd_score: number | null
+  bd_decision: string | null
+  pipeline_stage: string | null
+  confidence_score: number | null
 }
 
 export interface IPDetail {
@@ -200,4 +204,39 @@ export interface OpportunityData {
   explanations: string[]
   indicators: IndicatorResult[]
   confidence: ConfidenceData | null
+}
+
+export interface BDScoreData {
+  ip_id: string
+  ip_name: string
+  geo: string
+  timeframe: string
+  bd_score: number
+  bd_decision: 'START' | 'MONITOR' | 'REJECT'
+  fit_gate_score: number
+  fit_gate_passed: boolean
+  timing_urgency: number
+  demand_trajectory: number
+  market_gap: number
+  feasibility: number
+  raw_score: number
+  confidence_multiplier: number
+  explanations: string[]
+  pipeline_stage: string | null
+  indicators: IndicatorResult[]
+  confidence: ConfidenceData | null
+}
+
+export interface IPPipelineData {
+  ip_id: string
+  stage: string
+  target_launch_date: string | null
+  bd_start_date: string | null
+  license_start_date: string | null
+  license_end_date: string | null
+  mg_amount_usd: number | null
+  notes: string | null
+  bd_score: number | null
+  bd_decision: string | null
+  updated_at: string | null
 }

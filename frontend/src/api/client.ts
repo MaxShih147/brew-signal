@@ -2,6 +2,7 @@ import axios from 'axios'
 import type {
   IPItem, IPDetail, TrendResponse, HealthData, SignalsData, CollectResult, Alias, DiscoverAliasesResponse,
   OpportunityData, IPEvent, SourceHealthData, SourceRegistryData, SourceRunData, CoverageMatrixRow,
+  BDScoreData, IPPipelineData,
 } from '../types'
 
 const api = axios.create({
@@ -64,6 +65,23 @@ export const getOpportunity = (ipId: string, geo: string, timeframe: string) =>
 
 export const updateOpportunityInputs = (ipId: string, inputs: Record<string, number>) =>
   api.put(`/ip/${ipId}/opportunity`, { inputs }).then(r => r.data)
+
+// BD Allocation
+export const getBDScore = (ipId: string, geo: string, timeframe: string) =>
+  api.get<BDScoreData>(`/ip/${ipId}/bd-score`, { params: { geo, timeframe } }).then(r => r.data)
+
+export const getBDRanking = (geo: string, timeframe: string) =>
+  api.get<BDScoreData[]>('/ip/bd-ranking', { params: { geo, timeframe } }).then(r => r.data)
+
+// Pipeline
+export const getPipeline = (ipId: string) =>
+  api.get<IPPipelineData>(`/ip/${ipId}/pipeline`).then(r => r.data)
+
+export const createPipeline = (ipId: string, body: { stage?: string; target_launch_date?: string; mg_amount_usd?: number; notes?: string }) =>
+  api.post<IPPipelineData>(`/ip/${ipId}/pipeline`, body).then(r => r.data)
+
+export const updatePipeline = (ipId: string, body: Partial<IPPipelineData>) =>
+  api.put<IPPipelineData>(`/ip/${ipId}/pipeline`, body).then(r => r.data)
 
 // Collect
 export const runCollect = (ipId: string, geo: string, timeframe: string) =>

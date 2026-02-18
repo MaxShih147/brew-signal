@@ -3,7 +3,19 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Plus, Trash2, Loader2, Sparkles, ChevronRight } from 'lucide-react'
 import { listIPs, createIP, deleteIP, discoverAliases } from '../api/client'
 import type { IPItem } from '../types'
-import TrafficLight from '../components/TrafficLight'
+
+const DECISION_STYLES: Record<string, { bg: string; text: string; border: string; label: string }> = {
+  START: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', label: 'START' },
+  MONITOR: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', label: 'MONITOR' },
+  REJECT: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', label: 'REJECT' },
+}
+
+const STAGE_STYLES: Record<string, string> = {
+  negotiating: 'bg-blue-50 text-blue-700 border-blue-200',
+  secured: 'bg-violet-50 text-violet-700 border-violet-200',
+  launched: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  archived: 'bg-stone-100 text-stone-500 border-stone-200',
+}
 
 export default function IpList() {
   const [ips, setIPs] = useState<IPItem[]>([])
@@ -136,34 +148,80 @@ export default function IpList() {
         </div>
       ) : (
         <div className="grid gap-3">
-          {ips.map(ip => (
-            <Link
-              key={ip.id}
-              to={`/ips/${ip.id}`}
-              className="card flex items-center gap-4 group hover:border-brew-300 hover:shadow-md transition-all"
-            >
-              <TrafficLight signal={ip.signal_light} size="lg" />
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-brew-900">{ip.name}</div>
-                <div className="text-xs text-stone-400 mt-0.5 truncate">
-                  {ip.aliases.map(a => a.alias).join(' / ')}
-                </div>
-              </div>
-              <div className="text-right text-xs text-stone-400 shrink-0">
-                {ip.last_updated
-                  ? new Date(ip.last_updated).toLocaleDateString()
-                  : 'No data yet'}
-              </div>
-              <ChevronRight className="w-4 h-4 text-stone-300 group-hover:text-brew-500 transition-colors shrink-0" />
-              <button
-                onClick={(e) => handleDelete(e, ip.id, ip.name)}
-                className="opacity-0 group-hover:opacity-100 p-1.5 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all shrink-0"
-                title="Delete IP"
+          {ips.map(ip => {
+            const decision = ip.bd_decision ? DECISION_STYLES[ip.bd_decision] : null
+            const stageStyle = ip.pipeline_stage && ip.pipeline_stage !== 'candidate'
+              ? STAGE_STYLES[ip.pipeline_stage]
+              : null
+
+            return (
+              <Link
+                key={ip.id}
+                to={`/ips/${ip.id}`}
+                className="card flex items-center gap-4 group hover:border-brew-300 hover:shadow-md transition-all"
               >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </Link>
-          ))}
+                {/* BD Decision badge or unscored dot */}
+                <div className="w-20 shrink-0 flex flex-col items-center gap-1">
+                  {decision ? (
+                    <>
+                      <span className={`pill border ${decision.bg} ${decision.text} ${decision.border}`}>
+                        {decision.label}
+                      </span>
+                      <span className={`text-lg font-bold ${
+                        ip.bd_decision === 'START' ? 'text-emerald-600' :
+                        ip.bd_decision === 'MONITOR' ? 'text-amber-600' : 'text-red-500'
+                      }`}>
+                        {ip.bd_score?.toFixed(0) ?? '—'}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="pill border bg-stone-50 text-stone-400 border-stone-200">—</span>
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-brew-900">{ip.name}</span>
+                    {stageStyle && (
+                      <span className={`pill border ${stageStyle}`}>
+                        {ip.pipeline_stage}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-stone-400 mt-0.5 truncate">
+                    {ip.aliases.map(a => a.alias).join(' / ')}
+                  </div>
+                </div>
+
+                {/* Confidence */}
+                {ip.confidence_score != null && (
+                  <div className="text-right shrink-0">
+                    <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded border ${
+                      ip.confidence_score >= 70 ? 'bg-emerald-100 border-emerald-200 text-emerald-700' :
+                      ip.confidence_score >= 40 ? 'bg-amber-100 border-amber-200 text-amber-700' :
+                      'bg-stone-100 border-stone-200 text-stone-500'
+                    }`}>
+                      {ip.confidence_score}%
+                    </span>
+                  </div>
+                )}
+
+                <div className="text-right text-xs text-stone-400 shrink-0">
+                  {ip.last_updated
+                    ? new Date(ip.last_updated).toLocaleDateString()
+                    : 'No data yet'}
+                </div>
+                <ChevronRight className="w-4 h-4 text-stone-300 group-hover:text-brew-500 transition-colors shrink-0" />
+                <button
+                  onClick={(e) => handleDelete(e, ip.id, ip.name)}
+                  className="opacity-0 group-hover:opacity-100 p-1.5 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all shrink-0"
+                  title="Delete IP"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </Link>
+            )
+          })}
         </div>
       )}
     </div>

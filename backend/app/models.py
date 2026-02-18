@@ -20,6 +20,7 @@ class IP(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     aliases: Mapped[list["IPAlias"]] = relationship(back_populates="ip", cascade="all, delete-orphan")
+    pipeline: Mapped["IPPipeline | None"] = relationship(back_populates="ip", uselist=False, cascade="all, delete-orphan")
 
 
 class IPAlias(Base):
@@ -100,6 +101,25 @@ class OpportunityInput(Base):
     __table_args__ = (
         UniqueConstraint("ip_id", "indicator_key", name="uq_opportunity_input"),
     )
+
+
+class IPPipeline(Base):
+    __tablename__ = "ip_pipeline"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    ip_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("ip.id", ondelete="CASCADE"), nullable=False, unique=True)
+    stage: Mapped[str] = mapped_column(String(20), nullable=False, default="candidate")  # candidate|negotiating|secured|launched|archived
+    target_launch_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    bd_start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    license_start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    license_end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    mg_amount_usd: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    bd_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    bd_decision: Mapped[str | None] = mapped_column(String(10), nullable=True)  # START|MONITOR|REJECT
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    ip: Mapped["IP"] = relationship(back_populates="pipeline")
 
 
 class SourceRegistry(Base):

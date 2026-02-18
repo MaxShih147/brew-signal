@@ -55,6 +55,10 @@ class IPListItem(BaseModel):
     last_updated: Optional[datetime] = None
     signal_light: Optional[str] = None
     aliases: list[AliasOut] = []
+    bd_score: Optional[float] = None
+    bd_decision: Optional[str] = None
+    pipeline_stage: Optional[str] = None
+    confidence_score: Optional[int] = None
     model_config = {"from_attributes": True}
 
 
@@ -283,3 +287,58 @@ class ConfidenceOut(BaseModel):
     missing_sources: list[str] = []
     missing_indicators: list[str] = []
     last_calculated_at: Optional[datetime] = None
+
+
+# --- IPPipeline ---
+class IPPipelineCreate(BaseModel):
+    stage: str = "candidate"
+    target_launch_date: Optional[date] = None
+    mg_amount_usd: Optional[int] = None
+    notes: Optional[str] = None
+
+
+class IPPipelineUpdate(BaseModel):
+    stage: Optional[str] = None
+    target_launch_date: Optional[date] = None
+    bd_start_date: Optional[date] = None
+    license_start_date: Optional[date] = None
+    license_end_date: Optional[date] = None
+    mg_amount_usd: Optional[int] = None
+    notes: Optional[str] = None
+
+
+class IPPipelineOut(BaseModel):
+    ip_id: uuid.UUID
+    stage: str
+    target_launch_date: Optional[date] = None
+    bd_start_date: Optional[date] = None
+    license_start_date: Optional[date] = None
+    license_end_date: Optional[date] = None
+    mg_amount_usd: Optional[int] = None
+    notes: Optional[str] = None
+    bd_score: Optional[float] = None
+    bd_decision: Optional[str] = None
+    updated_at: Optional[datetime] = None
+    model_config = {"from_attributes": True}
+
+
+# --- BD Allocation ---
+class BDScoreResponse(BaseModel):
+    ip_id: uuid.UUID
+    ip_name: str
+    geo: str
+    timeframe: str
+    bd_score: float
+    bd_decision: str  # START|MONITOR|REJECT
+    fit_gate_score: float
+    fit_gate_passed: bool
+    timing_urgency: float
+    demand_trajectory: float
+    market_gap: float
+    feasibility: float
+    raw_score: float
+    confidence_multiplier: float
+    explanations: list[str]
+    pipeline_stage: Optional[str] = None
+    indicators: list[IndicatorResult]
+    confidence: Optional[ConfidenceOut] = None

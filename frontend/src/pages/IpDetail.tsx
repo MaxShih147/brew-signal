@@ -1,12 +1,12 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Trash2, Play, Loader2 } from 'lucide-react'
-import { getIP, getTrend, getHealth, getSignals, getOpportunity, updateOpportunityInputs, listEvents, runCollect, deleteIP } from '../api/client'
-import type { IPDetail as IPDetailType, DailyTrendPoint, TrendPointRaw, HealthData, SignalsData, OpportunityData, IndicatorResult, IPEvent } from '../types'
+import { getIP, getTrend, getHealth, getSignals, getBDScore, updateOpportunityInputs, listEvents, runCollect, deleteIP } from '../api/client'
+import type { IPDetail as IPDetailType, DailyTrendPoint, TrendPointRaw, HealthData, SignalsData, BDScoreData, IndicatorResult, IPEvent } from '../types'
 import IpConfigCard from '../components/IpConfigCard'
 import HealthCard from '../components/HealthCard'
 import TrendChart from '../components/TrendChart'
-import OpportunityScoreCard from '../components/OpportunityScoreCard'
+import BDScoreCard from '../components/BDScoreCard'
 import OpportunityMetricGrid from '../components/OpportunityMetricGrid'
 import EventsCard from '../components/EventsCard'
 import AlertsPanel from '../components/AlertsPanel'
@@ -23,14 +23,14 @@ export default function IpDetail() {
   const [byAliasData, setByAliasData] = useState<TrendPointRaw[]>([])
   const [health, setHealth] = useState<HealthData | null>(null)
   const [signals, setSignals] = useState<SignalsData | null>(null)
-  const [opportunity, setOpportunity] = useState<OpportunityData | null>(null)
+  const [bdScore, setBDScore] = useState<BDScoreData | null>(null)
   const [events, setEvents] = useState<IPEvent[]>([])
 
   const [loadingIP, setLoadingIP] = useState(true)
   const [loadingTrend, setLoadingTrend] = useState(true)
   const [loadingHealth, setLoadingHealth] = useState(true)
   const [loadingSignals, setLoadingSignals] = useState(true)
-  const [loadingOpportunity, setLoadingOpportunity] = useState(true)
+  const [loadingBD, setLoadingBD] = useState(true)
   const [collecting, setCollecting] = useState(false)
   const [collectMsg, setCollectMsg] = useState<string | null>(null)
 
@@ -52,14 +52,14 @@ export default function IpDetail() {
     setLoadingTrend(true)
     setLoadingHealth(true)
     setLoadingSignals(true)
-    setLoadingOpportunity(true)
+    setLoadingBD(true)
 
-    const [composite, byAlias, healthData, signalData, oppData, eventsData] = await Promise.allSettled([
+    const [composite, byAlias, healthData, signalData, bdData, eventsData] = await Promise.allSettled([
       getTrend(id, geo, timeframe, 'composite'),
       getTrend(id, geo, timeframe, 'by_alias'),
       getHealth(id, geo, timeframe),
       getSignals(id, geo, timeframe),
-      getOpportunity(id, geo, timeframe),
+      getBDScore(id, geo, timeframe),
       listEvents(id),
     ])
 
@@ -67,19 +67,20 @@ export default function IpDetail() {
     if (byAlias.status === 'fulfilled') setByAliasData(byAlias.value.points as TrendPointRaw[])
     if (healthData.status === 'fulfilled') setHealth(healthData.value)
     if (signalData.status === 'fulfilled') setSignals(signalData.value)
-    if (oppData.status === 'fulfilled') setOpportunity(oppData.value)
+    if (bdData.status === 'fulfilled') setBDScore(bdData.value)
     if (eventsData.status === 'fulfilled') setEvents(eventsData.value)
 
     setLoadingTrend(false)
     setLoadingHealth(false)
     setLoadingSignals(false)
-    setLoadingOpportunity(false)
+    setLoadingBD(false)
   }, [id, geo, timeframe])
 
   useEffect(() => { loadIP() }, [loadIP])
   useEffect(() => { loadData() }, [loadData])
 
-  const recomputeOpportunityScore = (indicators: IndicatorResult[]) => {
+  // BD Score formula (mirrors backend bd_allocation_service.py)
+  const recomputeBDScore = (indicators: IndicatorResult[]) => {
     const byDim: Record<string, number[]> = {}
     for (const ind of indicators) {
       if (!byDim[ind.dimension]) byDim[ind.dimension] = []
@@ -88,25 +89,61 @@ export default function IpDetail() {
     const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 50
 
     const demand = avg(byDim['demand'] || [50])
-    const diffusion = avg(byDim['diffusion'] || [50])
-    const fit = avg(byDim['fit'] || [50])
     const supply = avg(byDim['supply'] || [50])
+    const diffusion = avg(byDim['diffusion'] || [50])
     const rightsholder = indicators.find(i => i.key === 'rightsholder_intensity')?.score_0_100 ?? 50
-    const timing = indicators.find(i => i.key === 'timing_window')?.score_0_100 ?? 50
+    const timingRaw = indicators.find(i => i.key === 'timing_window')?.score_0_100 ?? 50
 
-    const base = 0.30 * demand + 0.20 * diffusion + 0.15 * fit
-    const timingMult = 0.8 + 0.4 * (timing / 100)
-    const riskMult = 1.0 / (1.0 + 0.25 * (supply / 100) + 0.10 * (rightsholder / 100))
-    const score = Math.max(0, Math.min(100, base * timingMult * riskMult * 1.35))
-    const light = score >= 70 ? 'green' : score >= 40 ? 'yellow' : 'red'
+    // Fit gate
+    const adultFit = indicators.find(i => i.key === 'adult_fit')?.score_0_100 ?? 50
+    const giftability = indicators.find(i => i.key === 'giftability')?.score_0_100 ?? 50
+    const brandAesthetic = indicators.find(i => i.key === 'brand_aesthetic')?.score_0_100 ?? 50
+    const fitGateScore = Math.min(adultFit, giftability, brandAesthetic)
+    const fitGatePassed = fitGateScore >= 30
 
-    return { score, light, base, timingMult, riskMult, demand, diffusion, fit, supply, rightsholder, timing }
+    // Timing urgency
+    const timingUrgency = Math.max(0, Math.min(100,
+      timingRaw * (1 + 0.3 * rightsholder / 100)
+    ))
+
+    // Demand trajectory
+    const searchMom = indicators.find(i => i.key === 'search_momentum')
+    const accelBonus = (searchMom?.raw?.acceleration) ? 10 : 0
+    const demandTrajectory = Math.max(0, Math.min(100, demand + accelBonus))
+
+    // Market gap
+    const marketGap = 100 - supply
+
+    // Feasibility
+    const feasibility = Math.max(0, Math.min(100,
+      0.5 * diffusion + 0.5 * (100 - rightsholder)
+    ))
+
+    // Raw score
+    const rawScore = 0.35 * timingUrgency + 0.30 * demandTrajectory + 0.20 * marketGap + 0.15 * feasibility
+
+    // Confidence multiplier (use existing)
+    const confMult = bdScore?.confidence_multiplier ?? 0.5
+    const score = Math.max(0, Math.min(100, rawScore * confMult))
+
+    // Decision
+    let decision: 'START' | 'MONITOR' | 'REJECT'
+    if (!fitGatePassed) decision = 'REJECT'
+    else if (score >= 70) decision = 'START'
+    else if (score >= 40) decision = 'MONITOR'
+    else decision = 'REJECT'
+
+    return {
+      score, decision, fitGateScore, fitGatePassed,
+      timingUrgency, demandTrajectory, marketGap, feasibility,
+      rawScore, confMult,
+    }
   }
 
   const handleSliderChange = (key: string, value: number) => {
-    if (!id || !opportunity) return
+    if (!id || !bdScore) return
 
-    const updated = opportunity.indicators.map(ind => {
+    const updated = bdScore.indicators.map(ind => {
       const matchKey = ind.key === 'timing_window' ? 'timing_window_override' : ind.key
       if (matchKey === key) {
         return { ...ind, score_0_100: value * 100, status: 'MANUAL' as const }
@@ -114,21 +151,20 @@ export default function IpDetail() {
       return ind
     })
 
-    const r = recomputeOpportunityScore(updated)
-    setOpportunity({
-      ...opportunity,
+    const r = recomputeBDScore(updated)
+    setBDScore({
+      ...bdScore,
       indicators: updated,
-      opportunity_score: r.score,
-      opportunity_light: r.light,
-      base_score: r.base,
-      timing_multiplier: r.timingMult,
-      risk_multiplier: r.riskMult,
-      demand_score: r.demand,
-      diffusion_score: r.diffusion,
-      fit_score: r.fit,
-      supply_risk: r.supply,
-      gatekeeper_risk: r.rightsholder,
-      timing_score: r.timing,
+      bd_score: r.score,
+      bd_decision: r.decision,
+      fit_gate_score: r.fitGateScore,
+      fit_gate_passed: r.fitGatePassed,
+      timing_urgency: r.timingUrgency,
+      demand_trajectory: r.demandTrajectory,
+      market_gap: r.marketGap,
+      feasibility: r.feasibility,
+      raw_score: r.rawScore,
+      confidence_multiplier: r.confMult,
     })
 
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -222,9 +258,9 @@ export default function IpDetail() {
             byAliasData={byAliasData}
             loading={loadingTrend}
           />
-          <OpportunityScoreCard data={opportunity} loading={loadingOpportunity} />
+          <BDScoreCard data={bdScore} loading={loadingBD} />
           <OpportunityMetricGrid
-            indicators={opportunity?.indicators || []}
+            indicators={bdScore?.indicators || []}
             onSliderChange={handleSliderChange}
           />
           <AlertsPanel alerts={signals?.alerts || []} />
