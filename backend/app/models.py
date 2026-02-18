@@ -189,6 +189,26 @@ class IPConfidence(Base):
     last_calculated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class YouTubeVideoMetric(Base):
+    __tablename__ = "youtube_video_metric"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    ip_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("ip.id", ondelete="CASCADE"), nullable=False)
+    video_id: Mapped[str] = mapped_column(String(11), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    channel_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    view_count: Mapped[int] = mapped_column(Integer, default=0)
+    like_count: Mapped[int] = mapped_column(Integer, default=0)
+    comment_count: Mapped[int] = mapped_column(Integer, default=0)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("ip_id", "video_id", name="uq_youtube_video_metric"),
+        Index("ix_youtube_video_metric_ip", "ip_id"),
+    )
+
+
 class CollectorRunLog(Base):
     __tablename__ = "collector_run_log"
 

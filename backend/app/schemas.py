@@ -147,6 +147,14 @@ class MALSyncResult(BaseModel):
     errors: list[str] = []
 
 
+class YouTubeSyncResult(BaseModel):
+    ip_id: uuid.UUID
+    ip_name: str
+    videos_added: int
+    videos_updated: int
+    errors: list[str] = []
+
+
 # --- Alias Discovery ---
 class DiscoverAliasesRequest(BaseModel):
     ip_name: Optional[str] = None  # override name to search; defaults to IP.name

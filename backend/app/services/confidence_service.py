@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.models import (
     IP, SourceRegistry, SourceRun, IPSourceHealth, IPConfidence,
-    OpportunityInput, DailyTrend, IPEvent,
+    OpportunityInput, DailyTrend, IPEvent, YouTubeVideoMetric,
 )
 from app.schemas import (
     SourceHealthOut, SourceRunOut, CoverageMatrixRow, IPSourceHealthCell, ConfidenceOut,
@@ -223,12 +223,20 @@ async def compute_ip_confidence(db: AsyncSession, ip_id: uuid.UUID) -> Confidenc
     )
     has_events = event_result.scalar() is not None
 
+    # Check if IP has YouTube data (makes video_momentum LIVE)
+    yt_result = await db.execute(
+        select(YouTubeVideoMetric.id).where(YouTubeVideoMetric.ip_id == ip_id).limit(1)
+    )
+    has_youtube = yt_result.scalar() is not None
+
     # Count active indicators (LIVE or MANUAL with stored input)
     active_indicators = len(stored_inputs)
     if has_trends:
         active_indicators += 2  # search_momentum + cross_alias_consistency (LIVE)
     if has_events:
         active_indicators += 1  # timing_window (LIVE from events)
+    if has_youtube:
+        active_indicators += 1  # video_momentum (LIVE from YouTube)
     total_indicators = TOTAL_INDICATORS
 
     missing_indicators = []
@@ -236,6 +244,8 @@ async def compute_ip_confidence(db: AsyncSession, ip_id: uuid.UUID) -> Confidenc
         if key == "search_momentum" and has_trends:
             continue
         if key == "timing_window" and has_events:
+            continue
+        if key == "video_momentum" and has_youtube:
             continue
         if key not in stored_inputs:
             missing_indicators.append(key)

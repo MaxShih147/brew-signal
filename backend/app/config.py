@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     pytrends_circuit_breaker_threshold: int = 5
     pytrends_circuit_breaker_cooldown_sec: int = 1800
 
+    # YouTube Data API v3
+    youtube_api_key: str = ""
+    youtube_max_results: int = 10
+    youtube_recency_days: int = 90
+
     # Anthropic Claude API (for alias discovery)
     anthropic_api_key: str = ""
 

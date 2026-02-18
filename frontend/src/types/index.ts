@@ -237,6 +237,14 @@ export interface MALSyncResult {
   errors: string[]
 }
 
+export interface YouTubeSyncResult {
+  ip_id: string
+  ip_name: string
+  videos_added: number
+  videos_updated: number
+  errors: string[]
+}
+
 export interface IPPipelineData {
   ip_id: string
   stage: string

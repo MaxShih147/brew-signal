@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Trash2, Play, Loader2, RefreshCw } from 'lucide-react'
-import { getIP, getTrend, getHealth, getSignals, getBDScore, updateOpportunityInputs, listEvents, runCollect, malSync, deleteIP } from '../api/client'
+import { getIP, getTrend, getHealth, getSignals, getBDScore, updateOpportunityInputs, listEvents, runCollect, malSync, youtubeSync, deleteIP } from '../api/client'
 import type { IPDetail as IPDetailType, DailyTrendPoint, TrendPointRaw, HealthData, SignalsData, BDScoreData, IndicatorResult, IPEvent } from '../types'
 import IpConfigCard from '../components/IpConfigCard'
 import HealthCard from '../components/HealthCard'
@@ -34,6 +34,7 @@ export default function IpDetail() {
   const [collecting, setCollecting] = useState(false)
   const [collectMsg, setCollectMsg] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
+  const [syncingYT, setSyncingYT] = useState(false)
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -209,6 +210,25 @@ export default function IpDetail() {
     }
   }
 
+  const handleYoutubeSync = async () => {
+    if (!id) return
+    setSyncingYT(true)
+    setCollectMsg(null)
+    try {
+      const result = await youtubeSync(id)
+      const parts = [
+        `${result.videos_added} videos synced`,
+        result.errors.length ? result.errors[0] : '',
+      ].filter(Boolean)
+      setCollectMsg(`YouTube sync: ${parts.join(', ')}`)
+      loadData()
+    } catch (err: any) {
+      setCollectMsg(`YouTube sync error: ${err.response?.data?.detail || err.message}`)
+    } finally {
+      setSyncingYT(false)
+    }
+  }
+
   if (loadingIP) {
     return (
       <div className="flex items-center justify-center gap-2 py-16 text-stone-400">
@@ -250,6 +270,14 @@ export default function IpDetail() {
             {syncing ? 'Syncing...' : 'Sync MAL'}
           </button>
           <button
+            onClick={handleYoutubeSync}
+            disabled={syncingYT}
+            className="px-4 py-2 bg-white border border-red-300 text-red-700 text-sm font-medium rounded-xl hover:bg-red-50 active:scale-[0.98] transition-all flex items-center gap-2 disabled:opacity-50"
+          >
+            {syncingYT ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+            {syncingYT ? 'Syncing...' : 'Sync YouTube'}
+          </button>
+          <button
             onClick={handleCollect}
             disabled={collecting}
             className="btn-primary flex items-center gap-2 disabled:opacity-50"
@@ -262,7 +290,7 @@ export default function IpDetail() {
 
       {collectMsg && (
         <div className={`mb-4 p-3 rounded-xl text-sm border ${
-          collectMsg.startsWith('success') || collectMsg.startsWith('MAL sync: Matched')
+          collectMsg.startsWith('success') || collectMsg.startsWith('MAL sync: Matched') || collectMsg.startsWith('YouTube sync:')
             ? 'bg-emerald-50/70 text-emerald-700 border-emerald-200'
             : 'bg-amber-50/70 text-amber-700 border-amber-200'
         }`}>

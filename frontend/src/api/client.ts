@@ -2,7 +2,7 @@ import axios from 'axios'
 import type {
   IPItem, IPDetail, TrendResponse, HealthData, SignalsData, CollectResult, Alias, DiscoverAliasesResponse,
   OpportunityData, IPEvent, SourceHealthData, SourceRegistryData, SourceRunData, CoverageMatrixRow,
-  BDScoreData, IPPipelineData, MALSyncResult,
+  BDScoreData, IPPipelineData, MALSyncResult, YouTubeSyncResult,
 } from '../types'
 
 const api = axios.create({
@@ -90,6 +90,10 @@ export const runCollect = (ipId: string, geo: string, timeframe: string) =>
 // MAL Sync
 export const malSync = (ipId: string) =>
   api.post<MALSyncResult>(`/collect/mal-sync/${ipId}`).then(r => r.data)
+
+// YouTube Sync
+export const youtubeSync = (ipId: string) =>
+  api.post<YouTubeSyncResult>(`/collect/youtube-sync/${ipId}`).then(r => r.data)
 
 // Admin: Data Health
 export const getSourceHealth = () =>

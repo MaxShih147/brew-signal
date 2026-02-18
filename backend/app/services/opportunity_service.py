@@ -1,11 +1,12 @@
 import uuid
+import math
 import statistics
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import DailyTrend, TrendPoint, IPAlias, IPEvent, OpportunityInput
+from app.models import DailyTrend, TrendPoint, IPAlias, IPEvent, OpportunityInput, YouTubeVideoMetric
 from app.schemas import IndicatorResult, OpportunityResponse
 from app.config import settings
 
@@ -15,7 +16,7 @@ INDICATOR_DEFS = [
     # (key, label, dimension, type)
     ("search_momentum", "Search Momentum", "demand", "LIVE"),
     ("social_buzz", "Social Buzz", "demand", "MANUAL"),
-    ("video_momentum", "Video Momentum", "demand", "MANUAL"),
+    ("video_momentum", "Video Momentum", "demand", "LIVE"),
     ("cross_alias_consistency", "Cross-alias Consistency", "diffusion", "LIVE"),
     ("cross_platform_presence", "Cross-platform Presence", "diffusion", "MANUAL"),
     ("ecommerce_density", "E-commerce Density", "supply", "MANUAL"),
@@ -237,6 +238,72 @@ async def compute_timing_window(
     )
 
 
+async def compute_video_momentum(db: AsyncSession, ip_id: uuid.UUID) -> IndicatorResult | None:
+    """Compute video_momentum from YouTubeVideoMetric data.
+
+    Returns an IndicatorResult if YouTube data exists, None otherwise (caller falls back to manual).
+
+    Scoring formula:
+      For each video published in last 90 days:
+        velocity = view_count / max(1, age_days)
+        recency_weight = 1.0 / (1.0 + age_days / 30)
+      weighted_velocity = sum(velocity * recency_weight) / count
+      raw = log10(1 + weighted_velocity) / log10(1 + 10000) * 100
+      score = clamp(0, 100, raw)
+      Bonus: any video > 1M views and < 14 days old → +15 (viral boost)
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(days=settings.youtube_recency_days)
+    result = await db.execute(
+        select(YouTubeVideoMetric).where(
+            YouTubeVideoMetric.ip_id == ip_id,
+            YouTubeVideoMetric.published_at >= cutoff,
+        )
+    )
+    videos = result.scalars().all()
+
+    if not videos:
+        return None
+
+    now = datetime.now(timezone.utc)
+    total_weighted_velocity = 0.0
+    viral_boost = False
+
+    for v in videos:
+        if not v.published_at:
+            continue
+        age_days = max(1, (now - v.published_at).total_seconds() / 86400)
+        velocity = v.view_count / age_days
+        recency_weight = 1.0 / (1.0 + age_days / 30)
+        total_weighted_velocity += velocity * recency_weight
+
+        if v.view_count > 1_000_000 and age_days < 14:
+            viral_boost = True
+
+    count = len(videos)
+    weighted_velocity = total_weighted_velocity / count if count > 0 else 0
+
+    raw = math.log10(1 + weighted_velocity) / math.log10(1 + 10000) * 100
+    score = _clamp(0, 100, raw)
+
+    if viral_boost:
+        score = _clamp(0, 100, score + 15)
+
+    return IndicatorResult(
+        key="video_momentum", label="Video Momentum", dimension="demand",
+        status="LIVE", score_0_100=round(score, 1),
+        raw={
+            "video_count": count,
+            "weighted_velocity": round(weighted_velocity, 1),
+            "viral_boost": viral_boost,
+        },
+        debug=[
+            f"{count} videos in last {settings.youtube_recency_days}d",
+            f"weighted_velocity={weighted_velocity:.1f}",
+            *(["viral boost +15"] if viral_boost else []),
+        ],
+    )
+
+
 # --- Manual indicator function ---
 
 def get_manual_score(key: str, label: str, dimension: str, manual_inputs: dict[str, float]) -> IndicatorResult:
@@ -415,10 +482,15 @@ async def get_opportunity_data(
     # A1: Search Momentum (LIVE)
     indicators.append(compute_search_momentum(latest))
 
-    # A2, A3: Social Buzz, Video Momentum (MANUAL)
-    for key, label, dimension, _ in INDICATOR_DEFS:
-        if key in ("social_buzz", "video_momentum"):
-            indicators.append(get_manual_score(key, label, dimension, stored_inputs))
+    # A2: Social Buzz (MANUAL)
+    indicators.append(get_manual_score("social_buzz", "Social Buzz", "demand", stored_inputs))
+
+    # A3: Video Momentum (LIVE from YouTube, fallback to MANUAL)
+    yt_indicator = await compute_video_momentum(db, ip_id)
+    if yt_indicator:
+        indicators.append(yt_indicator)
+    else:
+        indicators.append(get_manual_score("video_momentum", "Video Momentum", "demand", stored_inputs))
 
     # B1: Cross-alias Consistency (LIVE)
     indicators.append(await compute_cross_alias_consistency(db, ip_id, geo, timeframe))
