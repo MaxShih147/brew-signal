@@ -17,14 +17,13 @@ export default function TrendChart({ compositeData, byAliasData, loading }: Prop
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl border border-stone-200 p-5 shadow-sm">
-        <h2 className="text-lg font-semibold text-stone-800 mb-4">Trend</h2>
-        <div className="h-64 flex items-center justify-center text-stone-400">Loading chart...</div>
+      <div className="card">
+        <h2 className="card-header">Trend</h2>
+        <div className="h-64 flex items-center justify-center text-stone-400 text-sm">Loading chart...</div>
       </div>
     )
   }
 
-  // Build by-alias lookup: date -> alias -> value
   const aliasNames = [...new Set(byAliasData.map(p => p.alias || 'unknown'))]
   const aliasDateMap = new Map<string, Record<string, number>>()
   for (const p of byAliasData) {
@@ -34,7 +33,6 @@ export default function TrendChart({ compositeData, byAliasData, loading }: Prop
     aliasDateMap.get(p.date)![p.alias || 'unknown'] = p.value
   }
 
-  // Merge composite data with alias data for unified chart
   const chartData = compositeData.map(d => {
     const row: Record<string, any> = {
       date: d.date,
@@ -42,7 +40,6 @@ export default function TrendChart({ compositeData, byAliasData, loading }: Prop
       ma7: d.ma7,
       ma28: d.ma28,
     }
-    // Overlay enabled alias values
     const aliasVals = aliasDateMap.get(d.date)
     if (aliasVals) {
       for (const name of enabledAliases) {
@@ -57,41 +54,43 @@ export default function TrendChart({ compositeData, byAliasData, loading }: Prop
   const toggleAlias = (name: string) => {
     setEnabledAliases(prev => {
       const next = new Set(prev)
-      if (next.has(name)) {
-        next.delete(name)
-      } else {
-        next.add(name)
-      }
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
       return next
     })
   }
 
   return (
-    <div className="bg-white rounded-xl border border-stone-200 p-5 shadow-sm">
-      <h2 className="text-lg font-semibold text-stone-800 mb-4">Trend</h2>
+    <div className="card">
+      <h2 className="card-header">Trend</h2>
 
       <div className="h-72">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#f2d7b0" strokeOpacity={0.5} />
             <XAxis
               dataKey="date"
-              tick={{ fontSize: 11 }}
+              tick={{ fontSize: 11, fill: '#a8a29e' }}
               tickFormatter={d => {
                 const dt = new Date(d)
                 return `${dt.getMonth()+1}/${dt.getDate()}`
               }}
             />
-            <YAxis tick={{ fontSize: 11 }} domain={[0, 100]} />
+            <YAxis tick={{ fontSize: 11, fill: '#a8a29e' }} domain={[0, 100]} />
             <Tooltip
-              contentStyle={{ fontSize: 12, borderRadius: 8 }}
+              contentStyle={{
+                fontSize: 12,
+                borderRadius: 12,
+                border: '1px solid #f2d7b0',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+              }}
               labelFormatter={d => new Date(d).toLocaleDateString()}
             />
             <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Line type="monotone" dataKey="composite_value" stroke="#d68228" strokeWidth={2} dot={false} name="Composite" />
+            <Line type="monotone" dataKey="composite_value" stroke="#c46a1e" strokeWidth={2} dot={false} name="Composite" />
             <Line type="monotone" dataKey="ma7" stroke="#3b82f6" strokeWidth={1.5} strokeDasharray="4 2" dot={false} name="MA7" />
             <Line type="monotone" dataKey="ma28" stroke="#10b981" strokeWidth={1.5} strokeDasharray="8 4" dot={false} name="MA28" />
-            {[...enabledAliases].map((name, i) => (
+            {[...enabledAliases].map((name) => (
               <Line
                 key={name}
                 type="monotone"
@@ -106,7 +105,6 @@ export default function TrendChart({ compositeData, byAliasData, loading }: Prop
         </ResponsiveContainer>
       </div>
 
-      {/* Alias toggles */}
       {aliasNames.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {aliasNames.map((name, i) => {
@@ -116,14 +114,14 @@ export default function TrendChart({ compositeData, byAliasData, loading }: Prop
               <button
                 key={name}
                 onClick={() => toggleAlias(name)}
-                className={`flex items-center gap-1.5 px-2 py-1 text-xs rounded-md border transition-colors ${
+                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg border transition-all ${
                   active
-                    ? 'border-stone-300 bg-stone-50 text-stone-800 font-medium'
-                    : 'border-stone-200 bg-white text-stone-400 hover:text-stone-600 hover:border-stone-300'
+                    ? 'border-brew-300 bg-brew-50 text-stone-800 font-medium'
+                    : 'border-brew-100 bg-white text-stone-400 hover:text-stone-600 hover:border-brew-200'
                 }`}
               >
                 <span
-                  className="w-2.5 h-2.5 rounded-full shrink-0"
+                  className="w-2 h-2 rounded-full shrink-0"
                   style={{ backgroundColor: active ? color : '#d6d3d1' }}
                 />
                 {name}

@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
+import { ArrowLeft, Trash2, Play, Loader2 } from 'lucide-react'
 import { getIP, getTrend, getHealth, getSignals, getOpportunity, updateOpportunityInputs, listEvents, runCollect, deleteIP } from '../api/client'
 import type { IPDetail as IPDetailType, DailyTrendPoint, TrendPointRaw, HealthData, SignalsData, OpportunityData, IndicatorResult, IPEvent } from '../types'
 import IpConfigCard from '../components/IpConfigCard'
@@ -62,24 +63,12 @@ export default function IpDetail() {
       listEvents(id),
     ])
 
-    if (composite.status === 'fulfilled') {
-      setCompositeData(composite.value.points as DailyTrendPoint[])
-    }
-    if (byAlias.status === 'fulfilled') {
-      setByAliasData(byAlias.value.points as TrendPointRaw[])
-    }
-    if (healthData.status === 'fulfilled') {
-      setHealth(healthData.value)
-    }
-    if (signalData.status === 'fulfilled') {
-      setSignals(signalData.value)
-    }
-    if (oppData.status === 'fulfilled') {
-      setOpportunity(oppData.value)
-    }
-    if (eventsData.status === 'fulfilled') {
-      setEvents(eventsData.value)
-    }
+    if (composite.status === 'fulfilled') setCompositeData(composite.value.points as DailyTrendPoint[])
+    if (byAlias.status === 'fulfilled') setByAliasData(byAlias.value.points as TrendPointRaw[])
+    if (healthData.status === 'fulfilled') setHealth(healthData.value)
+    if (signalData.status === 'fulfilled') setSignals(signalData.value)
+    if (oppData.status === 'fulfilled') setOpportunity(oppData.value)
+    if (eventsData.status === 'fulfilled') setEvents(eventsData.value)
 
     setLoadingTrend(false)
     setLoadingHealth(false)
@@ -90,7 +79,6 @@ export default function IpDetail() {
   useEffect(() => { loadIP() }, [loadIP])
   useEffect(() => { loadData() }, [loadData])
 
-  // Optimistic local recompute mirrors backend formula
   const recomputeOpportunityScore = (indicators: IndicatorResult[]) => {
     const byDim: Record<string, number[]> = {}
     for (const ind of indicators) {
@@ -118,7 +106,6 @@ export default function IpDetail() {
   const handleSliderChange = (key: string, value: number) => {
     if (!id || !opportunity) return
 
-    // Optimistic update: modify indicator in local state
     const updated = opportunity.indicators.map(ind => {
       const matchKey = ind.key === 'timing_window' ? 'timing_window_override' : ind.key
       if (matchKey === key) {
@@ -144,7 +131,6 @@ export default function IpDetail() {
       timing_score: r.timing,
     })
 
-    // Debounced persist to backend
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
       updateOpportunityInputs(id, { [key]: value })
@@ -158,7 +144,6 @@ export default function IpDetail() {
     try {
       const result = await runCollect(id, geo, timeframe)
       setCollectMsg(`${result.status}: ${result.message}${result.duration_ms ? ` (${result.duration_ms}ms)` : ''}`)
-      // Reload data after collection
       loadData()
     } catch (err: any) {
       setCollectMsg(`Error: ${err.response?.data?.detail || err.message}`)
@@ -168,7 +153,12 @@ export default function IpDetail() {
   }
 
   if (loadingIP) {
-    return <div className="py-12 text-center text-stone-400">Loading...</div>
+    return (
+      <div className="flex items-center justify-center gap-2 py-16 text-stone-400">
+        <Loader2 className="w-5 h-5 animate-spin" />
+        <span className="text-sm">Loading...</span>
+      </div>
+    )
   }
   if (!ip) {
     return <div className="py-12 text-center text-stone-400">IP not found</div>
@@ -176,9 +166,12 @@ export default function IpDetail() {
 
   return (
     <div>
+      {/* Header */}
       <div className="flex items-center gap-3 mb-6">
-        <Link to="/ips" className="text-brew-600 hover:text-brew-700 text-sm">&larr; Back</Link>
-        <h1 className="text-2xl font-bold text-stone-800">{ip.name}</h1>
+        <Link to="/ips" className="text-brew-600 hover:text-brew-700 transition-colors">
+          <ArrowLeft className="w-5 h-5" />
+        </Link>
+        <h1 className="text-2xl font-bold text-brew-900">{ip.name}</h1>
         <button
           onClick={async () => {
             if (!id || !confirm(`Delete "${ip.name}" and all its data?`)) return
@@ -188,29 +181,28 @@ export default function IpDetail() {
           className="text-stone-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
           title="Delete IP"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
-          </svg>
+          <Trash2 className="w-4 h-4" />
         </button>
         <button
           onClick={handleCollect}
           disabled={collecting}
-          className="ml-auto px-4 py-2 bg-brew-600 text-white text-sm font-medium rounded-lg hover:bg-brew-700 disabled:opacity-50 transition-colors"
+          className="ml-auto btn-primary flex items-center gap-2 disabled:opacity-50"
         >
+          {collecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
           {collecting ? 'Collecting...' : 'Run Collection'}
         </button>
       </div>
 
       {collectMsg && (
-        <div className={`mb-4 p-3 rounded-lg text-sm ${
-          collectMsg.startsWith('success') ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+        <div className={`mb-4 p-3 rounded-xl text-sm border ${
+          collectMsg.startsWith('success') ? 'bg-emerald-50/70 text-emerald-700 border-emerald-200' : 'bg-amber-50/70 text-amber-700 border-amber-200'
         }`}>
           {collectMsg}
         </div>
       )}
 
+      {/* Main grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Left column: Config + Health */}
         <div className="space-y-5">
           <IpConfigCard
             ip={ip}
@@ -224,7 +216,6 @@ export default function IpDetail() {
           {id && <EventsCard ipId={id} events={events} onUpdate={loadData} />}
         </div>
 
-        {/* Right column: Chart + Opportunity + Alerts */}
         <div className="lg:col-span-2 space-y-5">
           <TrendChart
             compositeData={compositeData}

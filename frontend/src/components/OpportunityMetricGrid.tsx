@@ -15,12 +15,11 @@ const DIMENSION_LABELS: Record<string, string> = {
 }
 
 const STATUS_BADGE: Record<string, { bg: string; text: string }> = {
-  LIVE: { bg: 'bg-blue-100', text: 'text-blue-700' },
-  MANUAL: { bg: 'bg-amber-100', text: 'text-amber-700' },
-  MISSING: { bg: 'bg-stone-100', text: 'text-stone-500' },
+  LIVE: { bg: 'bg-blue-50', text: 'text-blue-600' },
+  MANUAL: { bg: 'bg-amber-50', text: 'text-amber-600' },
+  MISSING: { bg: 'bg-stone-100', text: 'text-stone-400' },
 }
 
-// Indicators that allow slider input
 const SLIDER_KEYS = new Set([
   'social_buzz', 'video_momentum', 'cross_platform_presence',
   'ecommerce_density', 'fnb_collab_saturation', 'merch_pressure',
@@ -29,9 +28,7 @@ const SLIDER_KEYS = new Set([
 ])
 
 export default function OpportunityMetricGrid({ indicators, onSliderChange }: Props) {
-  if (indicators.length === 0) {
-    return null
-  }
+  if (indicators.length === 0) return null
 
   const grouped: Record<string, IndicatorResult[]> = {}
   for (const ind of indicators) {
@@ -40,15 +37,15 @@ export default function OpportunityMetricGrid({ indicators, onSliderChange }: Pr
   }
 
   return (
-    <div className="bg-white rounded-xl border border-stone-200 p-5 shadow-sm">
-      <h2 className="text-lg font-semibold text-stone-800 mb-4">Indicator Grid</h2>
+    <div className="card">
+      <h2 className="card-header">Indicators</h2>
       <div className="space-y-5">
         {DIMENSION_ORDER.map(dim => {
           const items = grouped[dim]
           if (!items || items.length === 0) return null
           return (
             <div key={dim}>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-stone-400 mb-2">
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-2.5">
                 {DIMENSION_LABELS[dim] || dim}
               </h3>
               <div className="space-y-2">
@@ -88,24 +85,23 @@ function IndicatorRow({
     ? score > 60 ? 'bg-red-400' : score > 40 ? 'bg-amber-400' : 'bg-emerald-400'
     : score >= 60 ? 'bg-emerald-400' : score >= 40 ? 'bg-amber-400' : 'bg-red-400'
 
-  // For slider, use the indicator key; timing_window uses timing_window_override
   const sliderKey = indicator.key === 'timing_window' ? 'timing_window_override' : indicator.key
 
   return (
     <div className="flex items-center gap-2">
-      <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${bg} ${text} flex-shrink-0`}>
+      <span className={`pill ${bg} ${text} shrink-0`}>
         {indicator.status}
       </span>
-      <span className="text-xs text-stone-700 w-36 flex-shrink-0 truncate" title={indicator.label}>
+      <span className="text-xs text-stone-600 w-36 shrink-0 truncate" title={indicator.label}>
         {indicator.label}
       </span>
-      <div className="flex-1 h-1.5 bg-stone-100 rounded-full overflow-hidden">
+      <div className="flex-1 h-1.5 bg-brew-50 rounded-full overflow-hidden">
         <div
-          className={`h-full rounded-full transition-all ${barColor}`}
+          className={`h-full rounded-full transition-all duration-200 ${barColor}`}
           style={{ width: `${score}%` }}
         />
       </div>
-      <span className="text-xs text-stone-500 w-7 text-right flex-shrink-0">{score.toFixed(0)}</span>
+      <span className="text-xs font-mono text-stone-500 w-7 text-right shrink-0">{score.toFixed(0)}</span>
       {showSlider ? (
         <input
           type="range"
@@ -114,10 +110,10 @@ function IndicatorRow({
           step="0.1"
           value={score / 100}
           onChange={(e) => onSliderChange(sliderKey, parseFloat(e.target.value))}
-          className="w-20 flex-shrink-0 accent-brew-600"
+          className="w-20 shrink-0"
         />
       ) : (
-        <div className="w-20 flex-shrink-0" />
+        <div className="w-20 shrink-0" />
       )}
     </div>
   )

@@ -1,29 +1,47 @@
-import { Routes, Route, Navigate, Link } from 'react-router-dom'
-import { HeartPulse } from 'lucide-react'
+import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
+import { HeartPulse, LayoutGrid } from 'lucide-react'
 import BrandLogo from './components/BrandLogo'
 import IpList from './pages/IpList'
 import IpDetail from './pages/IpDetail'
 import DataHealthPage from './pages/DataHealthPage'
 
 export default function App() {
+  const location = useLocation()
+  const isHealth = location.pathname.startsWith('/admin')
+
   return (
-    <div className="min-h-screen">
-      <header className="bg-brew-700 text-white">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Link to="/ips" className="flex items-center gap-2 hover:text-brew-100 transition-colors">
+    <div className="min-h-screen flex flex-col">
+      <header className="bg-gradient-to-r from-brew-800 via-brew-700 to-brew-800 text-white shadow-lg shadow-brew-900/10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-4">
+          <Link to="/ips" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
             <BrandLogo size="md" />
-            <span className="text-xl font-bold tracking-tight">Brew Signal</span>
+            <span className="text-lg font-bold tracking-tight">Brew Signal</span>
           </Link>
-          <div className="text-brew-200 text-sm hidden sm:block">
-            IP Licensing Decisions
-          </div>
-          <Link to="/admin/data-health" className="ml-auto flex items-center gap-1.5 text-brew-200 hover:text-white text-xs transition-colors">
-            <HeartPulse className="w-3.5 h-3.5" />
-            Data Health
-          </Link>
+
+          <nav className="ml-auto flex items-center gap-1">
+            <Link
+              to="/ips"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                !isHealth ? 'bg-white/15 text-white' : 'text-brew-200 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              IPs
+            </Link>
+            <Link
+              to="/admin/data-health"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                isHealth ? 'bg-white/15 text-white' : 'text-brew-200 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <HeartPulse className="w-3.5 h-3.5" />
+              Health
+            </Link>
+          </nav>
         </div>
       </header>
-      <main className="max-w-7xl mx-auto px-4 py-6">
+
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
         <Routes>
           <Route path="/ips" element={<IpList />} />
           <Route path="/ips/:id" element={<IpDetail />} />
@@ -31,10 +49,11 @@ export default function App() {
           <Route path="*" element={<Navigate to="/ips" replace />} />
         </Routes>
       </main>
-      <footer className="border-t border-stone-200 mt-12">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center gap-2 text-xs text-stone-400">
-          <BrandLogo size="sm" className="text-stone-300" />
-          <span>Brew Signal &middot; 5min Coffee &middot; IP licensing decisions for FamilyMart drip coffee collaborations</span>
+
+      <footer className="border-t border-brew-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-2 text-xs text-stone-400">
+          <BrandLogo size="sm" className="text-brew-300" />
+          <span>Brew Signal &middot; 5min Coffee &middot; IP licensing decisions for FamilyMart drip coffee</span>
         </div>
       </footer>
     </div>
