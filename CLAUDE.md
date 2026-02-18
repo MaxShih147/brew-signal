@@ -300,3 +300,11 @@ frontend/
 
 ## Workflow
 - When the user says "pass", "lgtm", "ship it", or similar approval phrases — commit and push to origin without asking for review
+
+## Testing
+- Prefer letting the user test directly in the web app (Brew Signal) over terminal-only verification
+- After implementing a feature or fix, provide clear steps to test it in the browser:
+  - For backend changes: give the exact API call via Swagger UI (http://localhost:8000/docs) or the frontend page/flow to exercise
+  - For frontend changes: point to the specific page URL and what to click/look for
+- If DB cleanup is needed before testing (e.g. clearing stale/wrong data), do it proactively so the user can test immediately
+- Unit tests are still valuable for regression — write them, but always also show a browser-testable path

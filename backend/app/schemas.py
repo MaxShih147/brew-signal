@@ -137,6 +137,16 @@ class CollectRunResponse(BaseModel):
     duration_ms: Optional[int] = None
 
 
+class MALSyncResult(BaseModel):
+    ip_id: uuid.UUID
+    ip_name: str
+    mal_id: Optional[int] = None
+    matched: bool
+    events_added: int
+    events_skipped: int
+    errors: list[str] = []
+
+
 # --- Alias Discovery ---
 class DiscoverAliasesRequest(BaseModel):
     ip_name: Optional[str] = None  # override name to search; defaults to IP.name

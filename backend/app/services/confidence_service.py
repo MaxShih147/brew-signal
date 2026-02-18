@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.models import (
     IP, SourceRegistry, SourceRun, IPSourceHealth, IPConfidence,
-    OpportunityInput, DailyTrend,
+    OpportunityInput, DailyTrend, IPEvent,
 )
 from app.schemas import (
     SourceHealthOut, SourceRunOut, CoverageMatrixRow, IPSourceHealthCell, ConfidenceOut,
@@ -196,7 +196,10 @@ async def compute_ip_confidence(db: AsyncSession, ip_id: uuid.UUID) -> Confidenc
     health_map = {h.source_key: h for h in health_result.scalars().all()}
 
     # Count active sources (ok status)
+    # Sources with no health record are "not configured" — they lower coverage
+    # but are distinguished from sources that were attempted and failed
     active_sources = sum(1 for h in health_map.values() if h.status == "ok")
+    attempted_sources = len(health_map)
     missing_sources = [
         sk for sk in registries
         if sk not in health_map or health_map[sk].status == "down"
@@ -214,36 +217,57 @@ async def compute_ip_confidence(db: AsyncSession, ip_id: uuid.UUID) -> Confidenc
     )
     has_trends = dt_result.scalar() is not None
 
+    # Check if IP has events (makes timing_window LIVE)
+    event_result = await db.execute(
+        select(IPEvent.id).where(IPEvent.ip_id == ip_id).limit(1)
+    )
+    has_events = event_result.scalar() is not None
+
     # Count active indicators (LIVE or MANUAL with stored input)
     active_indicators = len(stored_inputs)
     if has_trends:
         active_indicators += 2  # search_momentum + cross_alias_consistency (LIVE)
+    if has_events:
+        active_indicators += 1  # timing_window (LIVE from events)
     total_indicators = TOTAL_INDICATORS
 
     missing_indicators = []
     for key in KEY_INDICATORS:
-        if key not in stored_inputs and not (key == "search_momentum" and has_trends):
+        if key == "search_momentum" and has_trends:
+            continue
+        if key == "timing_window" and has_events:
+            continue
+        if key not in stored_inputs:
             missing_indicators.append(key)
 
     # Compute confidence
     indicator_coverage = active_indicators / total_indicators if total_indicators > 0 else 0
-    source_coverage = active_sources / expected_sources if expected_sources > 0 else 0
+    # Source coverage: among attempted sources, what fraction is ok?
+    # Scale down by (attempted / expected) to reflect that not all sources are online yet
+    if attempted_sources > 0:
+        attempted_ok_ratio = active_sources / attempted_sources
+        configured_ratio = attempted_sources / expected_sources if expected_sources > 0 else 0
+        source_coverage = attempted_ok_ratio * configured_ratio
+    else:
+        source_coverage = 0
 
     base = 100 * (
         settings.confidence_indicator_weight * indicator_coverage
         + settings.confidence_source_weight * source_coverage
     )
 
-    # Penalties
+    # Penalties — only penalize key sources that were actually attempted
+    # Sources with no health record are "not configured", not "down"
     penalty = 0
     for sk, reg in registries.items():
         if not reg.is_key_source:
             continue
         h = health_map.get(sk)
-        status = h.status if h else "down"
-        if status == "down":
+        if h is None:
+            continue  # never attempted — no penalty, just lower coverage
+        if h.status == "down":
             penalty += settings.confidence_key_source_down_penalty
-        elif status == "warn":
+        elif h.status == "warn":
             penalty += settings.confidence_key_source_warn_penalty
 
     key_ind_penalty = len(missing_indicators) * settings.confidence_key_indicator_missing_penalty
@@ -258,7 +282,10 @@ async def compute_ip_confidence(db: AsyncSession, ip_id: uuid.UUID) -> Confidenc
         risk_count += reg.priority_weight
     risk_adjustment = (risk_sum / risk_count) if risk_count > 0 else 1.0
 
-    confidence_score = max(0, min(100, int(base * risk_adjustment - penalty)))
+    # Multiplicative penalty: penalties reduce confidence but can't zero it out
+    # Cap penalty fraction at 0.8 (penalties can reduce by at most 80%)
+    penalty_fraction = min(penalty / 100, 0.8)
+    confidence_score = max(0, min(100, int(base * risk_adjustment * (1 - penalty_fraction))))
 
     if confidence_score >= 80:
         band = "high"

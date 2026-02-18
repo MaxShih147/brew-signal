@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Trash2, Play, Loader2 } from 'lucide-react'
-import { getIP, getTrend, getHealth, getSignals, getBDScore, updateOpportunityInputs, listEvents, runCollect, deleteIP } from '../api/client'
+import { ArrowLeft, Trash2, Play, Loader2, RefreshCw } from 'lucide-react'
+import { getIP, getTrend, getHealth, getSignals, getBDScore, updateOpportunityInputs, listEvents, runCollect, malSync, deleteIP } from '../api/client'
 import type { IPDetail as IPDetailType, DailyTrendPoint, TrendPointRaw, HealthData, SignalsData, BDScoreData, IndicatorResult, IPEvent } from '../types'
 import IpConfigCard from '../components/IpConfigCard'
 import HealthCard from '../components/HealthCard'
@@ -33,6 +33,7 @@ export default function IpDetail() {
   const [loadingBD, setLoadingBD] = useState(true)
   const [collecting, setCollecting] = useState(false)
   const [collectMsg, setCollectMsg] = useState<string | null>(null)
+  const [syncing, setSyncing] = useState(false)
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -188,6 +189,26 @@ export default function IpDetail() {
     }
   }
 
+  const handleMalSync = async () => {
+    if (!id) return
+    setSyncing(true)
+    setCollectMsg(null)
+    try {
+      const result = await malSync(id)
+      const parts = [
+        result.matched ? `Matched (mal_id=${result.mal_id})` : 'No match',
+        `${result.events_added} events added`,
+        result.events_skipped ? `${result.events_skipped} skipped` : '',
+      ].filter(Boolean)
+      setCollectMsg(`MAL sync: ${parts.join(', ')}`)
+      loadData()
+    } catch (err: any) {
+      setCollectMsg(`MAL sync error: ${err.response?.data?.detail || err.message}`)
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   if (loadingIP) {
     return (
       <div className="flex items-center justify-center gap-2 py-16 text-stone-400">
@@ -219,19 +240,31 @@ export default function IpDetail() {
         >
           <Trash2 className="w-4 h-4" />
         </button>
-        <button
-          onClick={handleCollect}
-          disabled={collecting}
-          className="ml-auto btn-primary flex items-center gap-2 disabled:opacity-50"
-        >
-          {collecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-          {collecting ? 'Collecting...' : 'Run Collection'}
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={handleMalSync}
+            disabled={syncing}
+            className="px-4 py-2 bg-white border border-brew-300 text-brew-700 text-sm font-medium rounded-xl hover:bg-brew-50 active:scale-[0.98] transition-all flex items-center gap-2 disabled:opacity-50"
+          >
+            {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            {syncing ? 'Syncing...' : 'Sync MAL'}
+          </button>
+          <button
+            onClick={handleCollect}
+            disabled={collecting}
+            className="btn-primary flex items-center gap-2 disabled:opacity-50"
+          >
+            {collecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+            {collecting ? 'Collecting...' : 'Run Collection'}
+          </button>
+        </div>
       </div>
 
       {collectMsg && (
         <div className={`mb-4 p-3 rounded-xl text-sm border ${
-          collectMsg.startsWith('success') ? 'bg-emerald-50/70 text-emerald-700 border-emerald-200' : 'bg-amber-50/70 text-amber-700 border-amber-200'
+          collectMsg.startsWith('success') || collectMsg.startsWith('MAL sync: Matched')
+            ? 'bg-emerald-50/70 text-emerald-700 border-emerald-200'
+            : 'bg-amber-50/70 text-amber-700 border-amber-200'
         }`}>
           {collectMsg}
         </div>

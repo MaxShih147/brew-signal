@@ -227,6 +227,16 @@ export interface BDScoreData {
   confidence: ConfidenceData | null
 }
 
+export interface MALSyncResult {
+  ip_id: string
+  ip_name: string
+  mal_id: number | null
+  matched: boolean
+  events_added: number
+  events_skipped: number
+  errors: string[]
+}
+
 export interface IPPipelineData {
   ip_id: string
   stage: string

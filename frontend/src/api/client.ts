@@ -2,7 +2,7 @@ import axios from 'axios'
 import type {
   IPItem, IPDetail, TrendResponse, HealthData, SignalsData, CollectResult, Alias, DiscoverAliasesResponse,
   OpportunityData, IPEvent, SourceHealthData, SourceRegistryData, SourceRunData, CoverageMatrixRow,
-  BDScoreData, IPPipelineData,
+  BDScoreData, IPPipelineData, MALSyncResult,
 } from '../types'
 
 const api = axios.create({
@@ -86,6 +86,10 @@ export const updatePipeline = (ipId: string, body: Partial<IPPipelineData>) =>
 // Collect
 export const runCollect = (ipId: string, geo: string, timeframe: string) =>
   api.post<CollectResult>('/collect/run', { ip_id: ipId, geo, timeframe }).then(r => r.data)
+
+// MAL Sync
+export const malSync = (ipId: string) =>
+  api.post<MALSyncResult>(`/collect/mal-sync/${ipId}`).then(r => r.data)
 
 // Admin: Data Health
 export const getSourceHealth = () =>
