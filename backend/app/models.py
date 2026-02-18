@@ -209,6 +209,22 @@ class YouTubeVideoMetric(Base):
     )
 
 
+class MerchProductCount(Base):
+    __tablename__ = "merch_product_count"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    ip_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("ip.id", ondelete="CASCADE"), nullable=False)
+    platform: Mapped[str] = mapped_column(String(20), nullable=False)  # shopee|ruten
+    query_term: Mapped[str] = mapped_column(String(255), nullable=False)
+    product_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("ip_id", "platform", name="uq_merch_product_count"),
+        Index("ix_merch_product_count_ip", "ip_id"),
+    )
+
+
 class CollectorRunLog(Base):
     __tablename__ = "collector_run_log"
 

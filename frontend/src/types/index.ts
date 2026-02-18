@@ -245,6 +245,14 @@ export interface YouTubeSyncResult {
   errors: string[]
 }
 
+export interface MerchSyncResult {
+  ip_id: string
+  ip_name: string
+  shopee_count: number | null
+  ruten_count: number | null
+  errors: string[]
+}
+
 export interface IPPipelineData {
   ip_id: string
   stage: string

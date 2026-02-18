@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import DailyTrend, TrendPoint, IPAlias, IPEvent, OpportunityInput, YouTubeVideoMetric
+from app.models import DailyTrend, TrendPoint, IPAlias, IPEvent, OpportunityInput, YouTubeVideoMetric, MerchProductCount
 from app.schemas import IndicatorResult, OpportunityResponse
 from app.config import settings
 
@@ -304,6 +304,51 @@ async def compute_video_momentum(db: AsyncSession, ip_id: uuid.UUID) -> Indicato
     )
 
 
+async def compute_merch_pressure(db: AsyncSession, ip_id: uuid.UUID) -> IndicatorResult | None:
+    """Compute merch_pressure from MerchProductCount data.
+
+    Returns an IndicatorResult if e-commerce data exists, None otherwise (caller falls back to manual).
+
+    Scoring formula:
+      total = sum of product_counts across platforms (skip None/missing)
+      raw = log10(1 + total) / log10(1 + 10000) * 100
+      score = clamp(0, 100, raw)
+
+    Interpretation (supply dimension — higher = more saturated = riskier):
+      0 products → 0   (no merch, wide open market)
+      ~10         → ~25 (minimal, early/niche)
+      ~100        → ~50 (moderate competition)
+      ~1,000      → ~75 (heavy saturation)
+      ~10,000+    → 100 (extremely saturated)
+    """
+    result = await db.execute(
+        select(MerchProductCount).where(MerchProductCount.ip_id == ip_id)
+    )
+    rows = result.scalars().all()
+
+    if not rows:
+        return None
+
+    total = sum(r.product_count for r in rows)
+    platforms = {r.platform: r.product_count for r in rows}
+
+    raw = math.log10(1 + total) / math.log10(1 + 10000) * 100
+    score = _clamp(0, 100, raw)
+
+    return IndicatorResult(
+        key="merch_pressure", label="Merch Pressure", dimension="supply",
+        status="LIVE", score_0_100=round(score, 1),
+        raw={
+            "total_products": total,
+            **{f"{p}_count": c for p, c in platforms.items()},
+        },
+        debug=[
+            f"total={total} products across {len(rows)} platforms",
+            *(f"{p}={c}" for p, c in platforms.items()),
+        ],
+    )
+
+
 # --- Manual indicator function ---
 
 def get_manual_score(key: str, label: str, dimension: str, manual_inputs: dict[str, float]) -> IndicatorResult:
@@ -498,10 +543,15 @@ async def get_opportunity_data(
     # B2: Cross-platform Presence (MANUAL)
     indicators.append(get_manual_score("cross_platform_presence", "Cross-platform Presence", "diffusion", stored_inputs))
 
-    # C1-C3: Supply/Competition (MANUAL)
+    # C1-C3: Supply/Competition
+    # merch_pressure: LIVE from e-commerce data, fallback to MANUAL
+    merch_indicator = await compute_merch_pressure(db, ip_id)
     for key, label, dimension, _ in INDICATOR_DEFS:
         if dimension == "supply":
-            indicators.append(get_manual_score(key, label, dimension, stored_inputs))
+            if key == "merch_pressure" and merch_indicator:
+                indicators.append(merch_indicator)
+            else:
+                indicators.append(get_manual_score(key, label, dimension, stored_inputs))
 
     # D1: Rightsholder Intensity (MANUAL)
     indicators.append(get_manual_score("rightsholder_intensity", "Rightsholder Intensity", "gatekeeper", stored_inputs))

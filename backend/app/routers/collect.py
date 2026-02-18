@@ -4,12 +4,16 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.schemas import CollectRunRequest, CollectRunResponse, MALSyncResult, YouTubeSyncResult
+from app.schemas import CollectRunRequest, CollectRunResponse, MALSyncResult, YouTubeSyncResult, MerchSyncResult
 from app.services.trend_service import run_collection
 from app.services.mal_sync_service import sync_ip_from_mal, sync_all_ips
 from app.services.youtube_sync_service import (
     sync_ip_from_youtube,
     sync_all_ips as youtube_sync_all_ips,
+)
+from app.services.merch_sync_service import (
+    sync_ip_merch,
+    sync_all_ips as merch_sync_all_ips,
 )
 
 router = APIRouter(prefix="/api/collect", tags=["collect"])
@@ -50,4 +54,21 @@ async def youtube_sync_single(ip_id: uuid.UUID, db: AsyncSession = Depends(get_d
 async def youtube_sync_all(db: AsyncSession = Depends(get_db)):
     """Sync all IPs' video metrics from YouTube Data API."""
     results = await youtube_sync_all_ips(db)
+    return results
+
+
+@router.post("/merch-sync/{ip_id}", response_model=MerchSyncResult)
+async def merch_sync_single(ip_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Sync a single IP's merch product counts from TW e-commerce (Shopee + Ruten)."""
+    result = await sync_ip_merch(db, ip_id)
+    if result["errors"] and result["shopee_count"] is None and result["ruten_count"] is None:
+        if "IP not found" in result["errors"][0]:
+            raise HTTPException(status_code=404, detail=result["errors"][0])
+    return result
+
+
+@router.post("/merch-sync-all", response_model=list[MerchSyncResult])
+async def merch_sync_all(db: AsyncSession = Depends(get_db)):
+    """Sync all IPs' merch product counts from TW e-commerce."""
+    results = await merch_sync_all_ips(db)
     return results

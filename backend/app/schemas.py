@@ -155,6 +155,14 @@ class YouTubeSyncResult(BaseModel):
     errors: list[str] = []
 
 
+class MerchSyncResult(BaseModel):
+    ip_id: uuid.UUID
+    ip_name: str
+    shopee_count: int | None = None
+    ruten_count: int | None = None
+    errors: list[str] = []
+
+
 # --- Alias Discovery ---
 class DiscoverAliasesRequest(BaseModel):
     ip_name: Optional[str] = None  # override name to search; defaults to IP.name

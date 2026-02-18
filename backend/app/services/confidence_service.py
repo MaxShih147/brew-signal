@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.models import (
     IP, SourceRegistry, SourceRun, IPSourceHealth, IPConfidence,
-    OpportunityInput, DailyTrend, IPEvent, YouTubeVideoMetric,
+    OpportunityInput, DailyTrend, IPEvent, YouTubeVideoMetric, MerchProductCount,
 )
 from app.schemas import (
     SourceHealthOut, SourceRunOut, CoverageMatrixRow, IPSourceHealthCell, ConfidenceOut,
@@ -229,6 +229,12 @@ async def compute_ip_confidence(db: AsyncSession, ip_id: uuid.UUID) -> Confidenc
     )
     has_youtube = yt_result.scalar() is not None
 
+    # Check if IP has merch data (makes merch_pressure LIVE)
+    merch_result = await db.execute(
+        select(MerchProductCount.id).where(MerchProductCount.ip_id == ip_id).limit(1)
+    )
+    has_merch = merch_result.scalar() is not None
+
     # Count active indicators (LIVE or MANUAL with stored input)
     active_indicators = len(stored_inputs)
     if has_trends:
@@ -237,6 +243,10 @@ async def compute_ip_confidence(db: AsyncSession, ip_id: uuid.UUID) -> Confidenc
         active_indicators += 1  # timing_window (LIVE from events)
     if has_youtube:
         active_indicators += 1  # video_momentum (LIVE from YouTube)
+    if has_merch:
+        # Only count if not already counted as manual input
+        if "merch_pressure" not in stored_inputs:
+            active_indicators += 1  # merch_pressure (LIVE from e-commerce)
     total_indicators = TOTAL_INDICATORS
 
     missing_indicators = []
