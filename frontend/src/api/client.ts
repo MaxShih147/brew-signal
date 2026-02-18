@@ -2,7 +2,7 @@ import axios from 'axios'
 import type {
   IPItem, IPDetail, TrendResponse, HealthData, SignalsData, CollectResult, Alias, DiscoverAliasesResponse,
   OpportunityData, IPEvent, SourceHealthData, SourceRegistryData, SourceRunData, CoverageMatrixRow,
-  BDScoreData, IPPipelineData, MALSyncResult, YouTubeSyncResult, MerchSyncResult,
+  BDScoreData, IPPipelineData, MALSyncResult, YouTubeSyncResult, MerchSyncResult, LaunchPlanData,
 } from '../types'
 
 const api = axios.create({
@@ -82,6 +82,10 @@ export const createPipeline = (ipId: string, body: { stage?: string; target_laun
 
 export const updatePipeline = (ipId: string, body: Partial<IPPipelineData>) =>
   api.put<IPPipelineData>(`/ip/${ipId}/pipeline`, body).then(r => r.data)
+
+// Launch Timing
+export const getLaunchPlan = (ipId: string, geo: string, timeframe: string) =>
+  api.get<LaunchPlanData>(`/ip/${ipId}/launch-plan`, { params: { geo, timeframe } }).then(r => r.data)
 
 // Collect
 export const runCollect = (ipId: string, geo: string, timeframe: string) =>

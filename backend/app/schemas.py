@@ -368,3 +368,33 @@ class BDScoreResponse(BaseModel):
     pipeline_stage: Optional[str] = None
     indicators: list[IndicatorResult]
     confidence: Optional[ConfidenceOut] = None
+
+
+# --- Launch Timing ---
+class LaunchWeekScore(BaseModel):
+    week_start: date
+    launch_value: float
+    demand_score: float
+    event_boost: float
+    saturation_score: float
+    operational_risk: float
+
+
+class Milestone(BaseModel):
+    label: str
+    target_date: date
+    weeks_before_launch: int
+
+
+class LaunchPlanResponse(BaseModel):
+    ip_id: uuid.UUID
+    ip_name: str
+    recommended_launch_week: Optional[date] = None
+    backup_weeks: list[date] = []
+    launch_value_grid: list[LaunchWeekScore] = []
+    milestones: list[Milestone] = []
+    explanations: list[str] = []
+    confidence: Optional[ConfidenceOut] = None
+    license_start_date: Optional[date] = None
+    license_end_date: Optional[date] = None
+    events_in_window: list[IPEventOut] = []

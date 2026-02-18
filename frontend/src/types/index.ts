@@ -253,6 +253,35 @@ export interface MerchSyncResult {
   errors: string[]
 }
 
+export interface LaunchWeekScore {
+  week_start: string
+  launch_value: number
+  demand_score: number
+  event_boost: number
+  saturation_score: number
+  operational_risk: number
+}
+
+export interface Milestone {
+  label: string
+  target_date: string
+  weeks_before_launch: number
+}
+
+export interface LaunchPlanData {
+  ip_id: string
+  ip_name: string
+  recommended_launch_week: string | null
+  backup_weeks: string[]
+  launch_value_grid: LaunchWeekScore[]
+  milestones: Milestone[]
+  explanations: string[]
+  confidence: ConfidenceData | null
+  license_start_date: string | null
+  license_end_date: string | null
+  events_in_window: IPEvent[]
+}
+
 export interface IPPipelineData {
   ip_id: string
   stage: string

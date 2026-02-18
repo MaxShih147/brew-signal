@@ -1,12 +1,13 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Trash2, Play, Loader2, RefreshCw, ShoppingBag } from 'lucide-react'
-import { getIP, getTrend, getHealth, getSignals, getBDScore, updateOpportunityInputs, listEvents, runCollect, malSync, youtubeSync, merchSync, deleteIP } from '../api/client'
-import type { IPDetail as IPDetailType, DailyTrendPoint, TrendPointRaw, HealthData, SignalsData, BDScoreData, IndicatorResult, IPEvent } from '../types'
+import { getIP, getTrend, getHealth, getSignals, getBDScore, getLaunchPlan, updateOpportunityInputs, listEvents, runCollect, malSync, youtubeSync, merchSync, deleteIP } from '../api/client'
+import type { IPDetail as IPDetailType, DailyTrendPoint, TrendPointRaw, HealthData, SignalsData, BDScoreData, IndicatorResult, IPEvent, LaunchPlanData } from '../types'
 import IpConfigCard from '../components/IpConfigCard'
 import HealthCard from '../components/HealthCard'
 import TrendChart from '../components/TrendChart'
 import BDScoreCard from '../components/BDScoreCard'
+import LaunchPlanner from '../components/LaunchPlanner'
 import OpportunityMetricGrid from '../components/OpportunityMetricGrid'
 import EventsCard from '../components/EventsCard'
 import AlertsPanel from '../components/AlertsPanel'
@@ -24,6 +25,7 @@ export default function IpDetail() {
   const [health, setHealth] = useState<HealthData | null>(null)
   const [signals, setSignals] = useState<SignalsData | null>(null)
   const [bdScore, setBDScore] = useState<BDScoreData | null>(null)
+  const [launchPlan, setLaunchPlan] = useState<LaunchPlanData | null>(null)
   const [events, setEvents] = useState<IPEvent[]>([])
 
   const [loadingIP, setLoadingIP] = useState(true)
@@ -31,6 +33,7 @@ export default function IpDetail() {
   const [loadingHealth, setLoadingHealth] = useState(true)
   const [loadingSignals, setLoadingSignals] = useState(true)
   const [loadingBD, setLoadingBD] = useState(true)
+  const [loadingLaunch, setLoadingLaunch] = useState(false)
   const [collecting, setCollecting] = useState(false)
   const [collectMsg, setCollectMsg] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
@@ -72,6 +75,13 @@ export default function IpDetail() {
     if (signalData.status === 'fulfilled') setSignals(signalData.value)
     if (bdData.status === 'fulfilled') setBDScore(bdData.value)
     if (eventsData.status === 'fulfilled') setEvents(eventsData.value)
+
+    // Always auto-load launch plan
+    setLoadingLaunch(true)
+    getLaunchPlan(id, geo, timeframe)
+      .then(plan => setLaunchPlan(plan))
+      .catch(() => setLaunchPlan(null))
+      .finally(() => setLoadingLaunch(false))
 
     setLoadingTrend(false)
     setLoadingHealth(false)
@@ -348,6 +358,7 @@ export default function IpDetail() {
             loading={loadingTrend}
           />
           <BDScoreCard data={bdScore} loading={loadingBD} />
+          <LaunchPlanner data={launchPlan} loading={loadingLaunch} />
           <OpportunityMetricGrid
             indicators={bdScore?.indicators || []}
             onSliderChange={handleSliderChange}

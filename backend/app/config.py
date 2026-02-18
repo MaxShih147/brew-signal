@@ -50,6 +50,19 @@ class Settings(BaseSettings):
     bd_gatekeeper_urgency_factor: float = 0.3
     bd_base_lead_weeks: int = 12
 
+    # Launch Timing weights
+    launch_weight_demand: float = 0.35
+    launch_weight_event: float = 0.30
+    launch_weight_saturation: float = 0.20
+    launch_weight_ops_risk: float = 0.15
+    launch_lead_production: int = 8
+    launch_lead_sample_review: int = 12
+    launch_lead_artwork: int = 16
+    launch_lead_design_start: int = 20
+    launch_event_peak_weeks_before: int = 3
+    launch_event_sigma_weeks: float = 3.0
+    launch_fallback_window_months: int = 6
+
     # Source staleness thresholds (hours) — per source: [fresh_limit, warn_limit]
     # Beyond warn_limit = down. Format: source_key: [fresh_h, warn_h]
     staleness_google_trends_fresh_h: int = 72     # 3d
