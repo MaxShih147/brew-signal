@@ -1,6 +1,7 @@
 import axios from 'axios'
 import type {
   IPItem, IPDetail, TrendResponse, HealthData, SignalsData, CollectResult, Alias, DiscoverAliasesResponse,
+  OpportunityData, IPEvent, SourceHealthData, SourceRegistryData, SourceRunData, CoverageMatrixRow,
 } from '../types'
 
 const api = axios.create({
@@ -47,6 +48,36 @@ export const getSignals = (ipId: string, geo: string, timeframe: string) =>
 export const discoverAliases = (ipId: string, autoAdd: boolean = true) =>
   api.post<DiscoverAliasesResponse>(`/ip/${ipId}/discover-aliases?auto_add=${autoAdd}`, {}).then(r => r.data)
 
+// Events
+export const listEvents = (ipId: string) =>
+  api.get<IPEvent[]>(`/ip/${ipId}/events`).then(r => r.data)
+
+export const createEvent = (ipId: string, body: { event_type: string; title: string; event_date: string; source?: string }) =>
+  api.post<IPEvent>(`/ip/${ipId}/events`, body).then(r => r.data)
+
+export const deleteEvent = (eventId: string) =>
+  api.delete(`/ip/event/${eventId}`)
+
+// Opportunity
+export const getOpportunity = (ipId: string, geo: string, timeframe: string) =>
+  api.get<OpportunityData>(`/ip/${ipId}/opportunity`, { params: { geo, timeframe } }).then(r => r.data)
+
+export const updateOpportunityInputs = (ipId: string, inputs: Record<string, number>) =>
+  api.put(`/ip/${ipId}/opportunity`, { inputs }).then(r => r.data)
+
 // Collect
 export const runCollect = (ipId: string, geo: string, timeframe: string) =>
   api.post<CollectResult>('/collect/run', { ip_id: ipId, geo, timeframe }).then(r => r.data)
+
+// Admin: Data Health
+export const getSourceHealth = () =>
+  api.get<SourceHealthData[]>('/admin/data-health/sources').then(r => r.data)
+
+export const getSourceRegistry = () =>
+  api.get<SourceRegistryData[]>('/admin/data-health/registry').then(r => r.data)
+
+export const getCoverageMatrix = (limit: number = 50, onlyIssues: boolean = false) =>
+  api.get<CoverageMatrixRow[]>('/admin/data-health/matrix', { params: { limit, only_issues: onlyIssues } }).then(r => r.data)
+
+export const getSourceRuns = (sourceKey?: string, limit: number = 50) =>
+  api.get<SourceRunData[]>('/admin/data-health/runs', { params: { source_key: sourceKey, limit } }).then(r => r.data)

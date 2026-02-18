@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import ip, trend, collect
+from app.routers import ip, trend, collect, opportunity, admin
 
 logging.basicConfig(
     level=logging.INFO,
@@ -27,6 +27,8 @@ app.add_middleware(
 app.include_router(ip.router)
 app.include_router(trend.router)
 app.include_router(collect.router)
+app.include_router(opportunity.router)
+app.include_router(admin.router)
 
 
 @app.get("/api/health")

@@ -149,3 +149,137 @@ class DiscoverAliasesResponse(BaseModel):
     ip_id: uuid.UUID
     discovered: list[DiscoveredAlias]
     applied: int = 0  # how many were auto-added
+
+
+# --- IP Events ---
+EVENT_TYPES = {"anime_air", "movie_release", "game_release", "anniversary", "other"}
+
+
+class IPEventCreate(BaseModel):
+    event_type: str
+    title: str
+    event_date: date
+    source: Optional[str] = "manual"
+    source_url: Optional[str] = None
+
+
+class IPEventOut(BaseModel):
+    id: uuid.UUID
+    ip_id: uuid.UUID
+    event_type: str
+    title: str
+    event_date: date
+    source: Optional[str] = None
+    source_url: Optional[str] = None
+    created_at: datetime
+    model_config = {"from_attributes": True}
+
+
+# --- Opportunity Scoring ---
+class IndicatorResult(BaseModel):
+    key: str
+    label: str
+    dimension: str
+    status: str  # LIVE | MANUAL | MISSING
+    score_0_100: float
+    raw: Optional[dict] = None
+    debug: list[str] = []
+
+
+class OpportunityResponse(BaseModel):
+    ip_id: uuid.UUID
+    geo: str
+    timeframe: str
+    opportunity_score: float
+    opportunity_light: str  # green | yellow | red
+    base_score: float
+    risk_multiplier: float
+    timing_multiplier: float
+    demand_score: float
+    diffusion_score: float
+    fit_score: float
+    supply_risk: float
+    gatekeeper_risk: float
+    timing_score: float
+    coverage_ratio: float
+    explanations: list[str]
+    indicators: list[IndicatorResult]
+    confidence: Optional["ConfidenceOut"] = None
+
+
+class OpportunityInputUpdate(BaseModel):
+    inputs: dict[str, float]
+
+
+class OpportunityInputOut(BaseModel):
+    indicator_key: str
+    value: float
+    updated_at: Optional[datetime] = None
+    model_config = {"from_attributes": True}
+
+
+# --- Data Health & Confidence ---
+class SourceRegistryOut(BaseModel):
+    source_key: str
+    availability_level: str
+    risk_type: str
+    primary_endpoint: Optional[str] = None
+    fallback_endpoint: Optional[str] = None
+    is_key_source: bool
+    priority_weight: float
+    notes: Optional[str] = None
+    model_config = {"from_attributes": True}
+
+
+class SourceHealthOut(BaseModel):
+    source_key: str
+    status: str  # ok|warn|down
+    availability_level: str
+    risk_type: str
+    is_key_source: bool
+    last_success_at: Optional[datetime] = None
+    success_rate_24h: Optional[float] = None
+    success_rate_7d: Optional[float] = None
+    coverage: int = 0  # IPs with data in freshness window
+    total_ips: int = 0
+    last_error: Optional[str] = None
+
+
+class SourceRunOut(BaseModel):
+    id: uuid.UUID
+    source_key: str
+    started_at: datetime
+    finished_at: Optional[datetime] = None
+    status: str
+    duration_ms: Optional[int] = None
+    items_processed: int
+    items_succeeded: int
+    items_failed: int
+    error_sample: Optional[str] = None
+    model_config = {"from_attributes": True}
+
+
+class IPSourceHealthCell(BaseModel):
+    source_key: str
+    status: str  # ok|warn|down
+    last_success_at: Optional[datetime] = None
+    staleness_hours: Optional[int] = None
+    last_error: Optional[str] = None
+
+
+class CoverageMatrixRow(BaseModel):
+    ip_id: uuid.UUID
+    ip_name: str
+    sources: list[IPSourceHealthCell]
+
+
+class ConfidenceOut(BaseModel):
+    confidence_score: int
+    confidence_band: str  # high|medium|low|insufficient
+    active_indicators: int
+    total_indicators: int
+    active_sources: int
+    expected_sources: int
+    missing_sources: list[str] = []
+    missing_indicators: list[str] = []
+    last_calculated_at: Optional[datetime] = None

@@ -6,10 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.models import IP, IPAlias, DailyTrend, TrendPoint, CollectorRunLog
+from app.models import IP, IPAlias, IPEvent, DailyTrend, TrendPoint, CollectorRunLog
 from app.schemas import (
     IPCreate, IPOut, IPUpdate, IPListItem, AliasCreate, AliasUpdate, AliasOut,
     DiscoverAliasesRequest, DiscoverAliasesResponse, DiscoveredAlias,
+    IPEventCreate, IPEventOut, EVENT_TYPES,
 )
 from app.services.alias_discovery import discover_aliases
 from app.services.trend_service import _compute_daily_aggregation
@@ -201,3 +202,44 @@ async def discover_ip_aliases(
             await db.commit()
 
     return DiscoverAliasesResponse(ip_id=ip_id, discovered=discovered, applied=applied)
+
+
+# --- Events ---
+
+@router.get("/{ip_id}/events", response_model=list[IPEventOut])
+async def list_events(ip_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(IPEvent).where(IPEvent.ip_id == ip_id).order_by(IPEvent.event_date)
+    )
+    return result.scalars().all()
+
+
+@router.post("/{ip_id}/events", response_model=IPEventOut, status_code=201)
+async def create_event(ip_id: uuid.UUID, body: IPEventCreate, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(IP).where(IP.id == ip_id))
+    if not result.scalar_one_or_none():
+        raise HTTPException(404, "IP not found")
+    if body.event_type not in EVENT_TYPES:
+        raise HTTPException(400, f"Invalid event_type. Must be one of: {', '.join(sorted(EVENT_TYPES))}")
+    event = IPEvent(
+        ip_id=ip_id,
+        event_type=body.event_type,
+        title=body.title,
+        event_date=body.event_date,
+        source=body.source,
+        source_url=body.source_url,
+    )
+    db.add(event)
+    await db.commit()
+    await db.refresh(event)
+    return event
+
+
+@router.delete("/event/{event_id}", status_code=204)
+async def delete_event(event_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(IPEvent).where(IPEvent.id == event_id))
+    event = result.scalar_one_or_none()
+    if not event:
+        raise HTTPException(404, "Event not found")
+    await db.delete(event)
+    await db.commit()
