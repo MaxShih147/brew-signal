@@ -29,12 +29,12 @@ The system is split into **two stages**:
 
 ## Running
 ```bash
-cp .env.example .env  # then add your ANTHROPIC_API_KEY
+cp .env.example .env  # then add your ANTHROPIC_API_KEY, YOUTUBE_API_KEY
 docker compose up --build
 ```
-- Frontend: http://localhost:5173
-- Backend: http://localhost:8000
-- API docs: http://localhost:8000/docs
+- Frontend: http://localhost:5176
+- Backend: http://localhost:8001
+- API docs: http://localhost:8001/docs
 
 ---
 
@@ -269,26 +269,30 @@ frontend/
 
 ## Implementation Roadmap
 
-### Phase 0 (MVP plumbing)
-- IPPipeline model + migration
-- Pipeline CRUD endpoints
-- Make wiki_mal source run end-to-end
+### Phase 0 (MVP plumbing) — DONE
+- [x] IPPipeline model + migration
+- [x] Pipeline CRUD endpoints
+- [x] wiki_mal source run end-to-end
 
-### Phase 1 (Stage 1 MVP)
-- bd_allocation_service.py: fit gate + timing urgency + demand trajectory + market gap + feasibility
-- BDScoreCard.tsx + IpList candidate pool view
-- Portfolio ranking with slot allocation
+### Phase 1 (Stage 1 MVP) — DONE
+- [x] bd_allocation_service.py: fit gate + timing urgency + demand trajectory + market gap + feasibility
+- [x] BDScoreCard.tsx + IpList candidate pool view
+- [x] Portfolio ranking with slot allocation
 
-### Phase 2 (Stage 2 MVP)
-- launch_timing_service.py: launch_value(t) grid search with event overlay
-- LaunchPlanner.tsx + LaunchPlannerPage.tsx
-- Recommended launch window + timeline plan
+### Phase 2 (Stage 2 MVP) — DONE
+- [x] launch_timing_service.py: weekly launch_value(t) grid with demand extrapolation, event boost (Gaussian), saturation, operational risk (sigmoid)
+- [x] LaunchPlanner.tsx: Recharts area chart + milestone timeline + event markers + explanations
+- [x] Auto-loads on IP detail page for all pipeline stages
+- [x] GET /api/ip/{id}/launch-plan endpoint
+- [x] Config: all weights/lead-times tunable via .env (LAUNCH_WEIGHT_*, LAUNCH_LEAD_*)
 
-### Phase 3 (upgrade)
+### Phase 3 (upgrade) — TODO
 - Replace heuristic scoring with explicit EV vs Wait model
 - Add slot opportunity cost & MG lock cost
-- Better forecasting for demand/saturation curves
-- Live connectors (YouTube API, news RSS, Shopee)
+- Better forecasting for demand/saturation curves (time-varying saturation)
+- Live connectors (news RSS, Reddit/PTT/Dcard)
+- LaunchPlannerPage.tsx (dedicated full-page view)
+- Pipeline stage management from frontend UI
 
 ---
 
@@ -304,7 +308,7 @@ frontend/
 ## Testing
 - Prefer letting the user test directly in the web app (Brew Signal) over terminal-only verification
 - After implementing a feature or fix, provide clear steps to test it in the browser:
-  - For backend changes: give the exact API call via Swagger UI (http://localhost:8000/docs) or the frontend page/flow to exercise
-  - For frontend changes: point to the specific page URL and what to click/look for
+  - For backend changes: give the exact API call via Swagger UI (http://localhost:8001/docs) or the frontend page/flow to exercise
+  - For frontend changes: point to the specific page URL (http://localhost:5176) and what to click/look for
 - If DB cleanup is needed before testing (e.g. clearing stale/wrong data), do it proactively so the user can test immediately
 - Unit tests are still valuable for regression — write them, but always also show a browser-testable path
